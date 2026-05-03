@@ -3,6 +3,7 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -119,17 +120,8 @@ func extractOneExperimentConfig(name string, val any) *ExperimentConfig {
 		if ed, ok := v["end_date"].(string); ok {
 			cfg.EndDate = ed
 		}
-		if issue, ok := v["issue"]; ok {
-			switch n := issue.(type) {
-			case int:
-				cfg.Issue = n
-			case int64:
-				cfg.Issue = int(n)
-			case uint64:
-				cfg.Issue = int(n)
-			case float64:
-				cfg.Issue = int(n)
-			}
+		if n, ok := extractIntField(v["issue"]); ok {
+			cfg.Issue = n
 		}
 		if weightRaw, ok := v["weight"]; ok {
 			cfg.Weight = extractIntSlice(weightRaw)
@@ -143,24 +135,69 @@ func extractOneExperimentConfig(name string, val any) *ExperimentConfig {
 		if gmRaw, ok := v["guardrail_metrics"]; ok {
 			cfg.GuardrailMetrics = extractGuardrailMetrics(gmRaw)
 		}
-		if ms, ok := v["min_samples"]; ok {
-			switch n := ms.(type) {
-			case int:
-				cfg.MinSamples = n
-			case int64:
-				cfg.MinSamples = int(n)
-			case uint64:
-				cfg.MinSamples = int(n)
-			case float64:
-				cfg.MinSamples = int(n)
-			}
+		if n, ok := extractIntField(v["min_samples"]); ok {
+			cfg.MinSamples = n
 		}
 		if owner, ok := v["owner"].(string); ok {
 			cfg.Owner = owner
 		}
+		if at, ok := v["analysis_type"].(string); ok {
+			cfg.AnalysisType = at
+		}
+		if tagsRaw, ok := v["tags"]; ok {
+			cfg.Tags = extractStringSlice(tagsRaw)
+		}
+		if notifyRaw, ok := v["notify"]; ok {
+			if notifyMap, ok := notifyRaw.(map[string]any); ok {
+				notify := &ExperimentNotify{}
+				hasNotify := false
+				if n, ok := extractIntField(notifyMap["discussion"]); ok {
+					notify.Discussion = n
+					hasNotify = true
+				}
+				if n, ok := extractIntField(notifyMap["issue"]); ok {
+					notify.Issue = n
+					hasNotify = true
+				}
+				if hasNotify {
+					cfg.Notify = notify
+				}
+			}
+		}
 		return cfg
 	}
 	return nil
+}
+
+// extractIntField converts a numeric any value to int.
+// Returns (int(value), true) on success; (0, false) when val is nil, not a supported
+// numeric type, negative, or out of int range.
+// float64 values that are not integral (e.g. 12.9) are rejected.
+func extractIntField(val any) (int, bool) {
+	switch n := val.(type) {
+	case int:
+		if n < 0 {
+			return 0, false
+		}
+		return n, true
+	case int64:
+		if n < 0 || n > math.MaxInt {
+			return 0, false
+		}
+		return int(n), true
+	case uint64:
+		if n > uint64(math.MaxInt) {
+			return 0, false
+		}
+		return int(n), true
+	case float64:
+		// Reject non-integral or out-of-range float64 values.
+		if n < 0 || n > float64(math.MaxInt) || n != math.Trunc(n) {
+			return 0, false
+		}
+		return int(n), true
+	}
+	return 0, false
 }
 
 // extractStringSlice converts a raw value to a []string, accepting []any of string values.
