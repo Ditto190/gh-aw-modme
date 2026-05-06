@@ -95,6 +95,7 @@ describe("otlp.cjs", () => {
       GITHUB_AW_OTEL_PARENT_SPAN_ID: process.env.GITHUB_AW_OTEL_PARENT_SPAN_ID,
       GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY,
       GITHUB_RUN_ID: process.env.GITHUB_RUN_ID,
+      GITHUB_RUN_ATTEMPT: process.env.GITHUB_RUN_ATTEMPT,
       GITHUB_EVENT_NAME: process.env.GITHUB_EVENT_NAME,
       GITHUB_REF: process.env.GITHUB_REF,
       GITHUB_REF_NAME: process.env.GITHUB_REF_NAME,
@@ -356,6 +357,22 @@ describe("otlp.cjs", () => {
       await otlp.logSpan("my-scanner", {});
 
       expect(mockBuildGitHubActionsResourceAttributes).toHaveBeenCalledWith(expect.objectContaining({ runId: "12345678" }));
+    });
+
+    it("passes GITHUB_RUN_ATTEMPT to buildGitHubActionsResourceAttributes", async () => {
+      process.env.GITHUB_RUN_ATTEMPT = "3";
+
+      await otlp.logSpan("my-scanner", {});
+
+      expect(mockBuildGitHubActionsResourceAttributes).toHaveBeenCalledWith(expect.objectContaining({ runAttempt: "3" }));
+    });
+
+    it("passes '1' for runAttempt to buildGitHubActionsResourceAttributes when GITHUB_RUN_ATTEMPT is not set", async () => {
+      delete process.env.GITHUB_RUN_ATTEMPT;
+
+      await otlp.logSpan("my-scanner", {});
+
+      expect(mockBuildGitHubActionsResourceAttributes).toHaveBeenCalledWith(expect.objectContaining({ runAttempt: "1" }));
     });
 
     it("passes GITHUB_EVENT_NAME to buildGitHubActionsResourceAttributes when set", async () => {
