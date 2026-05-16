@@ -410,6 +410,45 @@ async function createFallbackIssue(githubClient, repoParts, title, body, labels,
 }
 
 /**
+ * Builds a compare URL used in protected-files fallback issue bodies.
+ * Optionally appends a prefilled PR body that closes the fallback issue.
+ * @param {string} githubServer
+ * @param {{owner: string, repo: string}} repoParts
+ * @param {string} baseBranch
+ * @param {string} branchName
+ * @param {string} title
+ * @param {number} [fallbackIssueNumber]
+ * @returns {string}
+ */
+function buildManifestProtectionCreatePrUrl(githubServer, repoParts, baseBranch, branchName, title, fallbackIssueNumber) {
+  const encodedBase = encodePathSegments(baseBranch);
+  const encodedHead = encodePathSegments(branchName);
+  let createPrUrl = `${githubServer}/${repoParts.owner}/${repoParts.repo}/compare/${encodedBase}...${encodedHead}?expand=1&title=${encodeURIComponent(title)}`;
+  if (typeof fallbackIssueNumber === "number") {
+    createPrUrl += `&body=${encodeURIComponent(`Closes #${fallbackIssueNumber}`)}`;
+  }
+  return createPrUrl;
+}
+
+/**
+ * Renders protected-files fallback issue body with a prefilled compare URL.
+ * @param {string} mainBodyContent
+ * @param {string} footerContent
+ * @param {string} fileList
+ * @param {string} createPrUrl
+ * @returns {string}
+ */
+function renderManifestProtectionFallbackBody(mainBodyContent, footerContent, fileList, createPrUrl) {
+  const templatePath = getPromptPath("manifest_protection_create_pr_fallback.md");
+  return renderTemplateFromFile(templatePath, {
+    main_body: mainBodyContent,
+    footer: footerContent,
+    files: fileList,
+    create_pr_url: createPrUrl,
+  });
+}
+
+/**
  * Maximum limits for pull request parameters to prevent resource exhaustion.
  * These limits align with GitHub's API constraints and security best practices.
  */
@@ -1905,22 +1944,36 @@ ${patchPreview}`;
         });
       } else {
         // Normal case — push succeeded, provide compare URL.
-        const encodedBase = encodePathSegments(baseBranch);
-        const encodedHead = encodePathSegments(branchName);
-        const createPrUrl = `${githubServer}/${repoParts.owner}/${repoParts.repo}/compare/${encodedBase}...${encodedHead}?expand=1&title=${encodeURIComponent(title)}`;
-        const templatePath = getPromptPath("manifest_protection_create_pr_fallback.md");
-        fallbackBody = renderTemplateFromFile(templatePath, {
-          main_body: mainBodyContent,
-          footer: footerContent,
-          files: fileList,
-          create_pr_url: createPrUrl,
-        });
+        const createPrUrl = buildManifestProtectionCreatePrUrl(githubServer, repoParts, baseBranch, branchName, title);
+        fallbackBody = renderManifestProtectionFallbackBody(mainBodyContent, footerContent, fileList, createPrUrl);
       }
 
       try {
         const { data: issue } = await createFallbackIssue(githubClient, repoParts, title, fallbackBody, mergeFallbackIssueLabels(effectiveFallbackLabels), configAssignees);
 
         core.info(`Created protected-file-protection review issue #${issue.number}: ${issue.html_url}`);
+
+        if (!manifestProtectionPushFailedError) {
+          try {
+            const createPrUrl = buildManifestProtectionCreatePrUrl(githubServer, repoParts, baseBranch, branchName, title, issue.number);
+            const fallbackBodyWithCloseKeyword = renderManifestProtectionFallbackBody(mainBodyContent, footerContent, fileList, createPrUrl);
+
+            await withRetry(
+              () =>
+                githubClient.rest.issues.update({
+                  owner: repoParts.owner,
+                  repo: repoParts.repo,
+                  issue_number: issue.number,
+                  body: fallbackBodyWithCloseKeyword,
+                }),
+              RATE_LIMIT_RETRY_CONFIG,
+              `update protected-file-protection fallback issue #${issue.number} with auto-close link`
+            );
+          } catch (updateIssueBodyError) {
+            core.warning(`Failed to update protected-file-protection fallback issue #${issue.number} with auto-close link: ${updateIssueBodyError instanceof Error ? updateIssueBodyError.message : String(updateIssueBodyError)}`);
+          }
+        }
+
         await assignCopilotToFallbackIssueIfEnabled(repoParts.owner, repoParts.repo, issue.number);
 
         await updateActivationComment(github, context, core, issue.html_url, issue.number, "issue");
