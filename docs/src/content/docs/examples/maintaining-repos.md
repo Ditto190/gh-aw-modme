@@ -1,6 +1,6 @@
 ---
-title: Automated Repository Maintenance with GitHub Agentic Workflows
-description: How to use repo-assist, safe-outputs, and integrity filtering to manage an open-source repository at scale — controlling what agents can do, filtering untrusted input, and debugging failures.
+title: 'Example: Automated Repository Maintenance'
+description: How to use repo-assist, safe-outputs, and integrity filtering to manage open-source repositories at scale — controlling what agents can do, filtering untrusted input, and debugging failures.
 sidebar:
   order: 20
 ---
