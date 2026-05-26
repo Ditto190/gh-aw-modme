@@ -150,14 +150,15 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 	readOnlyRuns := 0
 
 	for _, pr := range processedRuns {
-		stats, exists := workflowStats[pr.Run.WorkflowName]
+		wfID := workflowIDFromRun(pr.Run.WorkflowPath, pr.Run.WorkflowName)
+		stats, exists := workflowStats[wfID]
 		if !exists {
 			stats = &workflowObservabilityStats{
-				workflowName: pr.Run.WorkflowName,
+				workflowName: wfID,
 				minTurns:     pr.Run.Turns,
 				maxTurns:     pr.Run.Turns,
 			}
-			workflowStats[pr.Run.WorkflowName] = stats
+			workflowStats[wfID] = stats
 		}
 
 		stats.runs++
@@ -212,7 +213,7 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			Category: "reliability",
 			Severity: severity,
 			Title:    "Failure hotspot identified",
-			Summary:  fmt.Sprintf("Workflow %q accounted for %d failure(s) across %d run(s), a %.0f%% failure rate.", failureHotspot.workflowName, failureHotspot.failures, failureHotspot.runs, failureRate*100),
+			Summary:  fmt.Sprintf("Workflow %s accounted for %d failure(s) across %d run(s), a %.0f%% failure rate.", failureHotspot.workflowName, failureHotspot.failures, failureHotspot.runs, failureRate*100),
 			Evidence: fmt.Sprintf("workflow=%s failures=%d runs=%d", failureHotspot.workflowName, failureHotspot.failures, failureHotspot.runs),
 		})
 	}
@@ -236,7 +237,7 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			Category: "drift",
 			Severity: "medium",
 			Title:    "Execution drift observed",
-			Summary:  fmt.Sprintf("Workflow %q varied from %d to %d turns across runs, which suggests changing task shape or unstable prompts (avg %.1f turns).", driftHotspot.workflowName, driftHotspot.minTurns, driftHotspot.maxTurns, avgTurns),
+			Summary:  fmt.Sprintf("Workflow %s varied from %d to %d turns across runs, which suggests changing task shape or unstable prompts (avg %.1f turns).", driftHotspot.workflowName, driftHotspot.minTurns, driftHotspot.maxTurns, avgTurns),
 			Evidence: fmt.Sprintf("workflow=%s min_turns=%d max_turns=%d", driftHotspot.workflowName, driftHotspot.minTurns, driftHotspot.maxTurns),
 		})
 	}
@@ -261,7 +262,7 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			Category: "tooling",
 			Severity: severity,
 			Title:    "Capability hotspot identified",
-			Summary:  fmt.Sprintf("Workflow %q produced the most capability friction: %d missing tool(s), %d MCP failure(s), and %d missing data signal(s).", toolingHotspot.workflowName, toolingHotspot.missingTools, toolingHotspot.mcpFailures, toolingHotspot.missingData),
+			Summary:  fmt.Sprintf("Workflow %s produced the most capability friction: %d missing tool(s), %d MCP failure(s), and %d missing data signal(s).", toolingHotspot.workflowName, toolingHotspot.missingTools, toolingHotspot.mcpFailures, toolingHotspot.missingData),
 			Evidence: fmt.Sprintf("workflow=%s missing_tools=%d mcp_failures=%d missing_data=%d", toolingHotspot.workflowName, toolingHotspot.missingTools, toolingHotspot.mcpFailures, toolingHotspot.missingData),
 		})
 	}
@@ -287,7 +288,7 @@ func buildLogsObservabilityInsights(processedRuns []ProcessedRun, toolUsage []To
 			Category: "network",
 			Severity: severity,
 			Title:    "Network friction hotspot identified",
-			Summary:  fmt.Sprintf("Workflow %q had the highest firewall block pressure with %d blocked request(s) out of %d total (%.0f%%).", networkHotspot.workflowName, networkHotspot.blocked, networkHotspot.totalNet, networkRate*100),
+			Summary:  fmt.Sprintf("Workflow %s had the highest firewall block pressure with %d blocked request(s) out of %d total (%.0f%%).", networkHotspot.workflowName, networkHotspot.blocked, networkHotspot.totalNet, networkRate*100),
 			Evidence: fmt.Sprintf("workflow=%s blocked=%d total=%d", networkHotspot.workflowName, networkHotspot.blocked, networkHotspot.totalNet),
 		})
 	}

@@ -84,16 +84,17 @@ Examples:
   ` + string(constants.CLIExtensionPrefix) + ` logs --before-run-id 2000      # Filter runs before run ID 2000
   ` + string(constants.CLIExtensionPrefix) + ` logs --after-run-id 1000 --before-run-id 2000  # Filter runs in range
 
-  # Output options
+  # Output options (default output is compact format optimized for agents)
   ` + string(constants.CLIExtensionPrefix) + ` logs -o ./my-logs              # Custom output directory
   ` + string(constants.CLIExtensionPrefix) + ` logs --tool-graph              # Generate Mermaid tool sequence graph
   ` + string(constants.CLIExtensionPrefix) + ` logs --parse                   # Parse logs and generate Markdown reports
-  ` + string(constants.CLIExtensionPrefix) + ` logs --json                    # Output metrics in JSON format (compact by default, use -v for full)
-  ` + string(constants.CLIExtensionPrefix) + ` logs --json -v                 # Output full JSON with audit metadata
-  ` + string(constants.CLIExtensionPrefix) + ` logs --parse --json            # Generate both Markdown and JSON
-  ` + string(constants.CLIExtensionPrefix) + ` logs --format tsv              # Tab-separated output (most compact, ideal for agents)
-  ` + string(constants.CLIExtensionPrefix) + ` logs --format markdown         # Generate cross-run security audit report in Markdown
-  ` + string(constants.CLIExtensionPrefix) + ` logs --format pretty           # Generate cross-run security audit report in console format
+  ` + string(constants.CLIExtensionPrefix) + ` logs -v                        # Verbose compact output (extra columns + sections)
+  ` + string(constants.CLIExtensionPrefix) + ` logs --json                    # JSON format (compact by default, use -v for full)
+  ` + string(constants.CLIExtensionPrefix) + ` logs --json -v                 # Full JSON with audit metadata
+  ` + string(constants.CLIExtensionPrefix) + ` logs --format tsv              # Tab-separated (minimal, raw data)
+  ` + string(constants.CLIExtensionPrefix) + ` logs --format console          # Decorated console tables (human-friendly)
+  ` + string(constants.CLIExtensionPrefix) + ` logs --format markdown         # Cross-run security audit report (Markdown)
+  ` + string(constants.CLIExtensionPrefix) + ` logs --format pretty           # Cross-run security audit report (console)
   ` + string(constants.CLIExtensionPrefix) + ` logs weekly-research --format markdown --last 10  # Cross-run report for last 10 runs
   ` + string(constants.CLIExtensionPrefix) + ` logs --train                   # Train log pattern weights from last 10 runs
   ` + string(constants.CLIExtensionPrefix) + ` logs my-workflow --train -c 50 # Train log pattern weights from up to 50 runs of a specific workflow
@@ -348,7 +349,7 @@ Examples:
 	logsCmd.Flags().Int("timeout", 0, "Download timeout in minutes (0 = no timeout)")
 	logsCmd.Flags().String("summary-file", "summary.json", "Path to write the summary JSON file relative to output directory (use empty string to disable)")
 	logsCmd.Flags().Bool("train", false, "Analyze log patterns across downloaded runs and save pattern weights to drain3_weights.json in the output directory")
-	logsCmd.Flags().String("format", "", "Output format: tsv (compact tab-separated for agents), pretty (console report), markdown (Markdown report)")
+	logsCmd.Flags().String("format", "", "Output format: console (decorated tables), tsv (tab-separated), pretty (cross-run report), markdown (cross-run Markdown). Default: compact agent-optimized output")
 	logsCmd.Flags().Int("last", 0, "Alias for --count: number of recent runs to download")
 	logsCmd.Flags().StringSlice("artifacts", nil, "Artifact sets to download (default: all). Valid sets: "+strings.Join(ValidArtifactSetNames(), ", "))
 	logsCmd.Flags().String("cache-before", "", "(Cache eviction) Evict locally cached run folders for runs before this date, prior to downloading. Accepts deltas like -1d, -1w, -1mo (or explicit day counts like -30d), or an absolute date YYYY-MM-DD. Unlike --start-date, this only clears local cache and does not filter which runs are fetched.")

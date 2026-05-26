@@ -652,19 +652,16 @@ func renderLogsOutput(processedRuns []ProcessedRun, opts renderLogsOutputOptions
 	}
 
 	// Render output based on format preference.
-	// When --format tsv is specified, output tab-separated values for maximum token efficiency.
-	if opts.format == "tsv" {
+	switch opts.format {
+	case "tsv":
 		if opts.verbose {
 			renderLogsTSVVerbose(logsData)
 		} else {
 			renderLogsTSV(logsData)
 		}
 		return nil
-	}
 
-	// When --format markdown or --format pretty is specified, generate a cross-run audit report
-	// instead of the default metrics table.
-	if opts.format == "markdown" || opts.format == "pretty" {
+	case "markdown", "pretty":
 		inputs := make([]crossRunInput, 0, len(processedRuns))
 		for _, pr := range processedRuns {
 			inputs = append(inputs, crossRunInput{
@@ -693,24 +690,34 @@ func renderLogsOutput(processedRuns []ProcessedRun, opts renderLogsOutputOptions
 		}
 		renderCrossRunReportMarkdown(report)
 		return nil
+
+	case "console":
+		// Explicit console format: decorated tables for human reading
+		if opts.jsonOutput {
+			if err := renderLogsJSON(logsData, opts.verbose); err != nil {
+				return fmt.Errorf("failed to render JSON output: %w", err)
+			}
+		} else {
+			renderLogsConsole(logsData)
+			displayAggregatedGatewayMetrics(processedRuns, opts.outputDir, opts.verbose)
+			displayUnifiedTimeline(processedRuns, opts.verbose)
+			if opts.toolGraph {
+				generateToolGraph(processedRuns, opts.verbose)
+			}
+		}
+		return nil
 	}
 
+	// Default: compact format optimized for agentic consumption
 	if opts.jsonOutput {
 		if err := renderLogsJSON(logsData, opts.verbose); err != nil {
 			return fmt.Errorf("failed to render JSON output: %w", err)
 		}
 	} else {
-		renderLogsConsole(logsData)
-
-		// Display aggregated gateway metrics if any runs have gateway.jsonl files
-		displayAggregatedGatewayMetrics(processedRuns, opts.outputDir, opts.verbose)
-
-		// Display unified event timeline (gateway + firewall + agent events)
-		displayUnifiedTimeline(processedRuns, opts.verbose)
-
-		// Generate tool sequence graph if requested (console output only)
-		if opts.toolGraph {
-			generateToolGraph(processedRuns, opts.verbose)
+		if opts.verbose {
+			renderLogsCompactVerbose(logsData)
+		} else {
+			renderLogsCompact(logsData)
 		}
 	}
 
