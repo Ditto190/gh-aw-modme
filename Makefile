@@ -593,6 +593,7 @@ fmt-cjs:
 fmt-json:
 	@echo "→ Formatting JSON files..."
 	@cd actions/setup/js && npm run format:pkg-json --silent >/dev/null 2>&1
+	@npx prettier --write 'pkg/cli/data/models.json' 'actions/setup/js/models.json' --ignore-path .prettierignore --log-level=error 2>&1
 	@echo "✓ JSON files formatted"
 
 # Check formatting
@@ -646,6 +647,18 @@ validate-model-alias-chains:
 validate-registry:
 	@echo "Validating model_multipliers.json (R-REG-007: no placeholder or null multipliers)..."
 	@go test ./pkg/cli/... -run TestModelMultipliersNoPlaceholders -count=1
+
+MODELS_DEV_MODELS_JSON_URL ?= https://raw.githubusercontent.com/anomalyco/models.dev/refs/heads/dev/models.json
+
+.PHONY: refresh-models-json
+refresh-models-json:
+	@echo "Refreshing models.json from $(MODELS_DEV_MODELS_JSON_URL)..."
+	@tmp=$$(mktemp); \
+	curl -fsSL "$(MODELS_DEV_MODELS_JSON_URL)" | jq '.data |= map(select(.id | test("^(github|anthropic|openai)/")) | {id, pricing})' > "$$tmp"; \
+	cp "$$tmp" pkg/cli/data/models.json; \
+	cp "$$tmp" actions/setup/js/models.json; \
+	rm -f "$$tmp"; \
+	echo "✓ Refreshed pkg/cli/data/models.json and actions/setup/js/models.json (github/anthropic/openai only)"
 
 # Check file sizes and function counts
 .PHONY: check-file-sizes
