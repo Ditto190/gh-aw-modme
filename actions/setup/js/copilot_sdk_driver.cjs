@@ -39,7 +39,6 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { minimatch } = require("minimatch");
 
 // Default timeout for a single sendAndWait call: 10 minutes.
 // This is intentionally generous — the headless Copilot CLI has its own internal
@@ -204,7 +203,7 @@ function isReadPathAllowedByShellRules(requestedPath, allowedPathPatterns) {
     if (normalizedRequestedPath === normalizedPattern) {
       return true;
     }
-    return minimatch(normalizedRequestedPath, normalizedPattern, { dot: true });
+    return path.posix.matchesGlob(normalizedRequestedPath, normalizedPattern);
   });
 }
 
