@@ -693,6 +693,14 @@ func (c *Compiler) extractSafeOutputsConfig(frontmatter map[string]any) *SafeOut
 		}
 	}
 
+	// Force-disable threat detection when --use-samples is active: the replay driver
+	// emits synthetic outputs solely for deterministic end-to-end tests, and running
+	// an LLM-backed detection pass would defeat that determinism.
+	if config != nil && c.useSamples && config.ThreatDetection != nil {
+		safeOutputsConfigLog.Print("Disabling threat-detection because --use-samples is set")
+		config.ThreatDetection = nil
+	}
+
 	if config != nil {
 		safeOutputsConfigLog.Print("Successfully extracted safe-outputs configuration")
 	} else {
@@ -754,6 +762,48 @@ func (c *Compiler) parseBaseSafeOutputConfig(configMap map[string]any, config *B
 			safeOutputsConfigLog.Printf("Parsed staged flag: %t", stagedBool)
 			config.Staged = stagedBool
 		}
+	}
+
+	// Parse samples list (hidden feature: deterministic replay samples for --use-samples).
+	// Accepts either a YAML list of objects, or a single object that is auto-wrapped
+	// into a one-element list. The JSON schema rejects scalar/string shapes so we
+	// don't need a defensive YAML-string branch here.
+	if samples, exists := configMap["samples"]; exists {
+		parsed := parseSamplesValue(samples)
+		if len(parsed) > 0 {
+			safeOutputsConfigLog.Printf("Parsed %d samples entries", len(parsed))
+			config.Samples = parsed
+		}
+	}
+}
+
+// parseSamplesValue normalizes a `samples` frontmatter value into a list of
+// objects. Accepted shapes:
+//   - YAML list of mappings: returned as-is
+//   - single YAML mapping: wrapped into a one-element list
+//
+// Any other shape returns an empty slice — schema validation rejects those
+// shapes upstream and we keep this parser strict to match.
+func parseSamplesValue(samples any) []map[string]any {
+	switch v := samples.(type) {
+	case []any:
+		out := make([]map[string]any, 0, len(v))
+		for _, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				out = append(out, m)
+			} else if mStr, ok := item.(map[string]string); ok {
+				converted := make(map[string]any, len(mStr))
+				for k, s := range mStr {
+					converted[k] = s
+				}
+				out = append(out, converted)
+			}
+		}
+		return out
+	case map[string]any:
+		return []map[string]any{v}
+	default:
+		return nil
 	}
 }
 
