@@ -2225,6 +2225,50 @@ describe("handle_agent_failure", () => {
       expect(result).toContain("tool1");
       expect(result).toContain("tool2");
     });
+
+    it("suppresses generic context for repeated permission denied missing_tool entries", () => {
+      fs.writeFileSync(
+        path.join(tmpDir, "agent_output.json"),
+        JSON.stringify({
+          items: [{ type: "missing_tool", tool: "tool/permission", reason: "permission denied", denied_commands: ["go version 2>&1"] }],
+        })
+      );
+      vi.resetModules();
+      ({ buildMissingToolContext } = require("./handle_agent_failure.cjs"));
+      expect(buildMissingToolContext()).toBe("");
+    });
+
+    it("does not suppress tool/permission entry when denied_commands is empty", () => {
+      fs.writeFileSync(
+        path.join(tmpDir, "agent_output.json"),
+        JSON.stringify({
+          items: [{ type: "missing_tool", tool: "tool/permission", reason: "permission queried", denied_commands: [] }],
+        })
+      );
+      vi.resetModules();
+      ({ buildMissingToolContext } = require("./handle_agent_failure.cjs"));
+      const result = buildMissingToolContext();
+      expect(result).toContain("Missing Tools Reported");
+      expect(result).toContain("tool/permission");
+    });
+
+    it("keeps non-permission missing tools when permission-denied entries are present", () => {
+      fs.writeFileSync(
+        path.join(tmpDir, "agent_output.json"),
+        JSON.stringify({
+          items: [
+            { type: "missing_tool", tool: "tool/permission", reason: "permission denied", denied_commands: ["go version 2>&1"] },
+            { type: "missing_tool", tool: "bash", reason: "bash is not available" },
+          ],
+        })
+      );
+      vi.resetModules();
+      ({ buildMissingToolContext } = require("./handle_agent_failure.cjs"));
+      const result = buildMissingToolContext();
+      expect(result).toContain("Missing Tools Reported");
+      expect(result).toContain("bash");
+      expect(result).not.toContain("tool/permission");
+    });
   });
 
   // ──────────────────────────────────────────────────────

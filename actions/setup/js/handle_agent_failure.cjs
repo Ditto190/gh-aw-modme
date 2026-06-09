@@ -1111,12 +1111,21 @@ function loadMissingToolMessages(items) {
 }
 
 /**
+ * Determine whether a missing_tool message represents permission denial.
+ * @param {{tool: string|null, denied_commands: Array<string>}} message
+ * @returns {boolean}
+ */
+function isPermissionDeniedMissingTool(message) {
+  return message.tool === "tool/permission" && Array.isArray(message.denied_commands) && message.denied_commands.length > 0;
+}
+
+/**
  * Build missing_tool context string for display in failure issues/comments.
  * @param {Array<any>} [items] - Optional pre-loaded agent output items. When provided, avoids re-reading the output file.
  * @returns {string} Formatted missing tool context
  */
 function buildMissingToolContext(items) {
-  const missingToolMessages = loadMissingToolMessages(items);
+  const missingToolMessages = loadMissingToolMessages(items).filter(message => !isPermissionDeniedMissingTool(message));
 
   if (missingToolMessages.length === 0) {
     return "";
@@ -1142,9 +1151,7 @@ function buildMissingToolContext(items) {
  */
 function buildPermissionDeniedContext(items, workflowId) {
   const missingToolMessages = loadMissingToolMessages(items);
-
-  const isPermissionDeniedItem = m => m.tool === "tool/permission" && Array.isArray(m.denied_commands) && m.denied_commands.length > 0;
-  const permissionItems = missingToolMessages.filter(isPermissionDeniedItem);
+  const permissionItems = missingToolMessages.filter(isPermissionDeniedMissingTool);
 
   if (permissionItems.length === 0) {
     return "";
