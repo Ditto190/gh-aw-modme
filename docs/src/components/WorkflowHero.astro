@@ -76,6 +76,8 @@ function unmountFromHero() {
     let renderVersion = 0;
     /** @type {number | undefined} */
     let autoplayTimer;
+    const MINIMUM_STAGE_DIMENSION = 1;
+    const MINIMUM_RENDER_SCALE = 0.1;
 
     function stopCarousel() {
       window.clearInterval(autoplayTimer);
@@ -103,8 +105,16 @@ function unmountFromHero() {
 
       const devicePixelRatio = window.devicePixelRatio || 1;
       const baseViewport = page.getViewport({ scale: 1 });
-      const availableWidth = stage.clientWidth - 16;
-      const scale = Math.max(availableWidth / baseViewport.width, 0.5);
+      const stageStyles = window.getComputedStyle(stage);
+      const parseInset = (value) => Number.parseFloat(value) || 0;
+      const horizontalInset = parseInset(stageStyles.paddingLeft) + parseInset(stageStyles.paddingRight);
+      const verticalInset = parseInset(stageStyles.paddingTop) + parseInset(stageStyles.paddingBottom);
+      const availableWidth = Math.max(stage.clientWidth - horizontalInset, MINIMUM_STAGE_DIMENSION);
+      const availableHeight = Math.max(stage.clientHeight - verticalInset, MINIMUM_STAGE_DIMENSION);
+      const scale = Math.max(
+        Math.min(availableWidth / baseViewport.width, availableHeight / baseViewport.height),
+        MINIMUM_RENDER_SCALE,
+      );
       const viewport = page.getViewport({ scale });
 
       bufferCanvas.width = Math.floor(viewport.width * devicePixelRatio);
@@ -130,7 +140,10 @@ function unmountFromHero() {
       canvasContext.drawImage(bufferCanvas, 0, 0);
 
       activePage = pageNumber;
-      loading?.setAttribute('hidden', 'hidden');
+      if (loading) {
+        loading.setAttribute('hidden', 'hidden');
+        loading.style.display = 'none';
+      }
       root.classList.add('is-ready');
     }
 
