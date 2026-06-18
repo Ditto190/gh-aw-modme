@@ -46,3 +46,9 @@ func RunGHCombined(spinnerMessage string, args ...string) ([]byte, error) {
 func ForceGHHostEnv(cmd *exec.Cmd, host string) {
 	// no-op in Wasm: gh CLI subprocesses are not run
 }
+
+// SetDefaultGHHost is a no-op in Wasm builds; GH CLI is unavailable.
+func SetDefaultGHHost(_ string) {}
+
+// getDefaultGHHost always returns "" in Wasm builds.
+func getDefaultGHHost() string { return "" }
