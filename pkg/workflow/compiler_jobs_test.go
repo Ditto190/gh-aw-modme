@@ -3737,6 +3737,7 @@ func TestPushRepoMemoryJobConditionalDetection(t *testing.T) {
 
 // TestUpdateCacheMemoryJobConditionalDetection verifies that update_cache_memory keeps always()
 // but requires detection success (not skipped) when detection is expression-controlled.
+// Detection always runs when the agent ran (even for noop), so 'success' is sufficient.
 func TestUpdateCacheMemoryJobConditionalDetection(t *testing.T) {
 	compiler := NewCompiler()
 	compiler.jobManager = NewJobManager()
