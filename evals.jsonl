@@ -1,0 +1,2 @@
+{"id":"labels-applied","question":"Did the agent apply at least one label to an unlabeled issue, or correctly call noop when no unlabeled issues were found?","answer":"NO","model":"copilot/gpt-5.4","timestamp":"2026-07-18T19:41:52.473Z","runid":"29658121327"}
+{"id":"report-created","question":"Was a summary discussion created listing the issues processed and the labels applied?","answer":"NO","model":"copilot/gpt-5.4","timestamp":"2026-07-18T19:41:52.473Z","runid":"29658121327"}
