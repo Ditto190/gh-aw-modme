@@ -236,6 +236,7 @@ _ = timesleepnocontext.Analyzer
 - `github.com/github/gh-aw/pkg/linters/timeafterleak` — time-after-leak analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/timesleepnocontext` — time-sleep-no-context analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/tolowerequalfold` — to-lower-equal-fold analyzer subpackage
+- `github.com/github/gh-aw/pkg/linters/trimleftright` — trim-left-right analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/uncheckedtypeassertion` — unchecked-type-assertion analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/wgdonenotdeferred` — wg-done-not-deferred analyzer subpackage
 - `github.com/github/gh-aw/pkg/linters/writebytestring` — write-byte-string analyzer subpackage
