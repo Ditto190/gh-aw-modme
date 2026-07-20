@@ -1,0 +1,2 @@
+{"id":"cli_inspected","question":"Did the agent inspect the gh-aw CLI commands and analyze their output for inconsistencies, typos, or documentation gaps?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-20T15:15:34.192Z","runid":"29754150834"}
+{"id":"issue_created_or_noop","question":"Was an issue created with specific CLI inconsistencies found, or was noop used when no issues were detected?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-20T15:15:34.192Z","runid":"29754150834"}
