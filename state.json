@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "detail_level": {
+      "comprehensive": 1
+    }
+  },
+  "runs": [
+    {
+      "run_id": "29738448164",
+      "timestamp": "2026-07-20T11:25:06.229Z",
+      "assignments": {
+        "detail_level": "comprehensive"
+      }
+    }
+  ]
+}
