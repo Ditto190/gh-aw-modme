@@ -1,13 +1,20 @@
 {
   "counts": {
     "output_format": {
-      "detailed": 1
+      "detailed": 2
     }
   },
   "runs": [
     {
       "run_id": "29675049086",
       "timestamp": "2026-07-19T05:34:30.711Z",
+      "assignments": {
+        "output_format": "detailed"
+      }
+    },
+    {
+      "run_id": "29715116181",
+      "timestamp": "2026-07-20T03:39:27.390Z",
       "assignments": {
         "output_format": "detailed"
       }
