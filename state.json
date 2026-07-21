@@ -1,13 +1,20 @@
 {
   "counts": {
     "prompt_style": {
-      "detailed": 1
+      "detailed": 2
     }
   },
   "runs": [
     {
       "run_id": "29754599532",
       "timestamp": "2026-07-20T15:19:22.087Z",
+      "assignments": {
+        "prompt_style": "detailed"
+      }
+    },
+    {
+      "run_id": "29835758713",
+      "timestamp": "2026-07-21T13:44:21.131Z",
       "assignments": {
         "prompt_style": "detailed"
       }
