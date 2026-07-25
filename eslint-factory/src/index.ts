@@ -28,6 +28,7 @@ import { requireFsIoTryCatchRule } from "./rules/require-fs-io-try-catch";
 import { noSetFailedThenExitZeroRule } from "./rules/no-setfailed-then-exit-zero";
 import { noErrStackThenStringFallbackRule } from "./rules/no-err-stack-then-string-fallback";
 import { requireFetchTryCatchRule } from "./rules/require-fetch-try-catch";
+import { noUnguardedNumberEnvReadRule } from "./rules/no-unguarded-number-env-read";
 
 const plugin = {
   meta: {
@@ -65,6 +66,7 @@ const plugin = {
     "no-setfailed-then-exit-zero": noSetFailedThenExitZeroRule,
     "no-err-stack-then-string-fallback": noErrStackThenStringFallbackRule,
     "require-fetch-try-catch": requireFetchTryCatchRule,
+    "no-unguarded-number-env-read": noUnguardedNumberEnvReadRule,
   },
 };
 
