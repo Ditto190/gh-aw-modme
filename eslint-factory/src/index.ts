@@ -29,6 +29,7 @@ import { noSetFailedThenExitZeroRule } from "./rules/no-setfailed-then-exit-zero
 import { noErrStackThenStringFallbackRule } from "./rules/no-err-stack-then-string-fallback";
 import { noCaughtErrorInterpolationRule } from "./rules/no-caught-error-interpolation";
 import { requireFetchTryCatchRule } from "./rules/require-fetch-try-catch";
+import { requireFetchAbortSignalRule } from "./rules/require-fetch-abort-signal";
 import { noCoreErrorThenSetFailedRule } from "./rules/no-core-error-then-setfailed";
 
 const plugin = {
@@ -68,6 +69,7 @@ const plugin = {
     "no-err-stack-then-string-fallback": noErrStackThenStringFallbackRule,
     "no-caught-error-interpolation": noCaughtErrorInterpolationRule,
     "require-fetch-try-catch": requireFetchTryCatchRule,
+    "require-fetch-abort-signal": requireFetchAbortSignalRule,
     "no-core-error-then-setfailed": noCoreErrorThenSetFailedRule,
   },
 };
