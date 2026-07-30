@@ -3,7 +3,7 @@
     "sub_agent_strategy": {
       "delegated_sequential": 3,
       "inline_strict": 2,
-      "single_agent_control": 2
+      "single_agent_control": 3
     }
   },
   "runs": [
@@ -54,6 +54,13 @@
       "timestamp": "2026-07-29T19:40:04.082Z",
       "assignments": {
         "sub_agent_strategy": "inline_strict"
+      }
+    },
+    {
+      "run_id": "30575849455",
+      "timestamp": "2026-07-30T19:42:10.000Z",
+      "assignments": {
+        "sub_agent_strategy": "single_agent_control"
       }
     }
   ]
