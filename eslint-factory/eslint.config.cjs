@@ -14,6 +14,7 @@ module.exports = [
     rules: {
       "gh-aw-custom/no-core-exportvariable-non-string": "warn",
       "gh-aw-custom/no-core-setoutput-non-string": "warn",
+      "gh-aw-custom/no-core-setfailed-non-string": "warn",
       "gh-aw-custom/no-throw-plain-object": "warn",
       "gh-aw-custom/no-github-request-interpolated-route": "warn",
       "gh-aw-custom/no-json-stringify-error": "warn",
