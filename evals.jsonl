@@ -1,2 +1,2 @@
-{"id":"action_versions_checked","question":"Did the agent check GitHub Actions versions for available updates?","answer":"NO","model":"small","timestamp":"2026-08-01T07:44:09.774Z","runid":"30690195290"}
-{"id":"update_pr_created_or_noop","question":"Did the agent create a pull request for required updates, or report that no changes were needed?","answer":"UNKNOWN","model":"small","timestamp":"2026-08-01T07:44:09.774Z","runid":"30690195290"}
+{"id":"action_versions_checked","question":"Did the agent check GitHub Actions versions for available updates?","answer":"NO","model":"evals","timestamp":"2026-08-02T07:45:06.413Z","runid":"30738306899"}
+{"id":"update_pr_created_or_noop","question":"Did the agent create a pull request for required updates, or report that no changes were needed?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-02T07:45:06.413Z","runid":"30738306899"}
