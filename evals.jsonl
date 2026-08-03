@@ -1,2 +1,2 @@
-{"id":"concurrency_analyzed","question":"Did the agent analyze safe-outputs MCP server tools for thread-safety and race conditions?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T10:12:26.550Z","runid":"30622001358"}
-{"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"UNKNOWN","model":"small","timestamp":"2026-07-31T10:12:26.550Z","runid":"30622001358"}
+{"id":"concurrency_analyzed","question":"Did the agent analyze safe-outputs MCP server tools for thread-safety and race conditions?","answer":"NO","model":"evals","timestamp":"2026-08-03T10:28:32.687Z","runid":"30805410260"}
+{"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-03T10:28:32.687Z","runid":"30805410260"}
