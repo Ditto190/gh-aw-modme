@@ -13,6 +13,7 @@ import { requireAwaitCoreSummaryWriteRule } from "./rules/require-await-core-sum
 import { requireFsSyncTryCatchRule } from "./rules/require-fs-sync-try-catch";
 import { requireJsonParseTryCatchRule } from "./rules/require-json-parse-try-catch";
 import { requireErrorCauseInRethrowRule } from "./rules/require-error-cause-in-rethrow";
+import { requireEnvParseIntNanCheckRule } from "./rules/require-env-parseint-nan-check";
 import { requireParseIntRadixRule } from "./rules/require-parseInt-radix";
 import { requireMkdirSyncTryCatchRule } from "./rules/require-mkdirsync-try-catch";
 import { requireRmSyncTryCatchRule } from "./rules/require-rmsync-try-catch";
@@ -60,6 +61,7 @@ const plugin = {
     "require-mkdirsync-try-catch": requireMkdirSyncTryCatchRule,
     "require-rmsync-try-catch": requireRmSyncTryCatchRule,
     "require-parseInt-radix": requireParseIntRadixRule,
+    "require-env-parseint-nan-check": requireEnvParseIntNanCheckRule,
     "require-return-after-core-setfailed": requireReturnAfterCoreSetFailedRule,
     "require-spawnsync-error-check": requireSpawnSyncErrorCheckRule,
     "require-new-url-try-catch": requireNewUrlTryCatchRule,
