@@ -1,2 +1,4 @@
 {"id":"experiment_issue_created","question":"Did the agent create a GitHub issue with an A/B experiment campaign for a selected workflow?","answer":"NO","model":"copilot/gpt-5.4","timestamp":"2026-08-05T11:14:32.584Z","runid":"31000360697"}
 {"id":"workflow_targeted","question":"Did the agent identify and target a workflow that lacks an experiments section?","answer":"NO","model":"copilot/gpt-5.4","timestamp":"2026-08-05T11:14:32.584Z","runid":"31000360697"}
+{"id":"experiment_issue_created","question":"Did the agent create a GitHub issue with an A/B experiment campaign for a selected workflow?","answer":"NO","model":"copilot/gpt-5.4","timestamp":"2026-08-06T12:28:18.987Z","runid":"31101160151"}
+{"id":"workflow_targeted","question":"Did the agent identify and target a workflow that lacks an experiments section?","answer":"NO","model":"copilot/gpt-5.4","timestamp":"2026-08-06T12:28:18.987Z","runid":"31101160151"}
