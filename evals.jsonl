@@ -1,0 +1,2 @@
+{"id":"security_scan_performed","question":"Did the agent perform a deep red teaming security scan of actions/setup/js and actions/setup/sh directories?","answer":"NO","model":"copilot/claude-sonnet-4.5","timestamp":"2026-08-07T01:47:43.676Z","runid":"31138949451"}
+{"id":"findings_reported_or_noop","question":"Were security findings (backdoors, secret leaks, malicious code) reported, or was noop used when no issues were detected?","answer":"NO","model":"copilot/claude-sonnet-4.5","timestamp":"2026-08-07T01:47:43.676Z","runid":"31138949451"}
