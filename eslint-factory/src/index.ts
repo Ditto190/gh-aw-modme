@@ -39,6 +39,7 @@ import { requireNanCheckAfterEnvNumericParseRule } from "./rules/require-nan-che
 import { preferStructuredCloneRule } from "./rules/prefer-structured-clone";
 import { requireFetchResponseBodyTryCatchRule } from "./rules/require-fetch-response-body-try-catch";
 import { requireErrorCodeInThrownErrorRule } from "./rules/require-error-code-in-thrown-error";
+import { requireGetExecOutputExitCodeCheckRule } from "./rules/require-getexecoutput-exitcode-check";
 
 const plugin = {
   meta: {
@@ -87,6 +88,7 @@ const plugin = {
     "prefer-structured-clone": preferStructuredCloneRule,
     "require-fetch-response-body-try-catch": requireFetchResponseBodyTryCatchRule,
     "require-error-code-in-thrown-error": requireErrorCodeInThrownErrorRule,
+    "require-getexecoutput-exitcode-check": requireGetExecOutputExitCodeCheckRule,
   },
 };
 
