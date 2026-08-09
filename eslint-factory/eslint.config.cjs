@@ -54,6 +54,7 @@ module.exports = [
       "gh-aw-custom/require-fetch-response-body-try-catch": "warn",
       "gh-aw-custom/require-error-code-in-thrown-error": "warn",
       "gh-aw-custom/require-invalid-date-check-before-compare": "warn",
+      "gh-aw-custom/require-decode-uri-try-catch": "warn",
     },
   },
   {
