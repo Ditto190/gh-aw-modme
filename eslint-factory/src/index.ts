@@ -40,6 +40,7 @@ import { preferStructuredCloneRule } from "./rules/prefer-structured-clone";
 import { requireFetchResponseBodyTryCatchRule } from "./rules/require-fetch-response-body-try-catch";
 import { requireErrorCodeInThrownErrorRule } from "./rules/require-error-code-in-thrown-error";
 import { requireInvalidDateCheckBeforeCompareRule } from "./rules/require-invalid-date-check-before-compare";
+import { requireDecodeUriTryCatchRule } from "./rules/require-decode-uri-try-catch";
 
 const plugin = {
   meta: {
@@ -89,6 +90,7 @@ const plugin = {
     "require-fetch-response-body-try-catch": requireFetchResponseBodyTryCatchRule,
     "require-error-code-in-thrown-error": requireErrorCodeInThrownErrorRule,
     "require-invalid-date-check-before-compare": requireInvalidDateCheckBeforeCompareRule,
+    "require-decode-uri-try-catch": requireDecodeUriTryCatchRule,
   },
 };
 
