@@ -10,3 +10,5 @@
 {"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-11T10:17:29.801Z","runid":"31480573774"}
 {"id":"concurrency_analyzed","question":"Did the agent analyze safe-outputs MCP server tools for thread-safety and race conditions?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-12T10:27:49.597Z","runid":"31586510302"}
 {"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-12T10:27:49.597Z","runid":"31586510302"}
+{"id":"concurrency_analyzed","question":"Did the agent analyze safe-outputs MCP server tools for thread-safety and race conditions?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-13T10:28:11.747Z","runid":"31690293663"}
+{"id":"findings_reported_or_noop","question":"Were concurrency issues reported, or was noop used when all tools were thread-safe?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-13T10:28:11.747Z","runid":"31690293663"}
