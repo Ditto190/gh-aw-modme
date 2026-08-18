@@ -24,3 +24,5 @@
 {"id":"report_created","question":"Was a secrets analysis report produced with findings and recommendations?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-16T18:01:37.846Z","runid":"31962766081"}
 {"id":"secrets_analyzed","question":"Did the agent analyze secret usage patterns across compiled lock.yml workflow files?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-17T18:09:06.134Z","runid":"32052646675"}
 {"id":"report_created","question":"Was a secrets analysis report produced with findings and recommendations?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-17T18:09:06.134Z","runid":"32052646675"}
+{"id":"secrets_analyzed","question":"Did the agent analyze secret usage patterns across compiled lock.yml workflow files?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-18T18:08:09.903Z","runid":"32168309238"}
+{"id":"report_created","question":"Was a secrets analysis report produced with findings and recommendations?","answer":"UNKNOWN","model":"evals","timestamp":"2026-08-18T18:08:09.903Z","runid":"32168309238"}
