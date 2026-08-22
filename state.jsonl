@@ -27,3 +27,4 @@
 {"run_id":"32177284510","timestamp":"2026-08-18T19:34:32.749Z","assignments":{"sub_agent_strategy":"single_agent_control"}}
 {"run_id":"32409673465","timestamp":"2026-08-20T19:38:21.489Z","assignments":{"sub_agent_strategy":"single_agent_control"}}
 {"run_id":"32518915700","timestamp":"2026-08-21T19:32:23.917Z","assignments":{"sub_agent_strategy":"single_agent_control"}}
+{"run_id":"32593083730","timestamp":"2026-08-22T19:14:25.785Z","harness_version":"c353474561ffe102fead57525a110e5fff09f0c18923938b574aeab5cce00ed9:0daed06ad9ab37f712e54a71683b2f3c690ab0cce61735ab8ecf312216a2f4ec","assignments":{"sub_agent_strategy":"single_agent_control"}}
