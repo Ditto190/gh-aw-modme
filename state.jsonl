@@ -30,3 +30,4 @@
 {"run_id":"32034848202","timestamp":"2026-08-17T13:24:12.487Z","assignments":{"prompt_compression":"caveman"}}
 {"run_id":"32142344805","timestamp":"2026-08-18T13:27:13.499Z","assignments":{"prompt_compression":"caveman"}}
 {"run_id":"32487026716","timestamp":"2026-08-21T13:29:26.048Z","assignments":{"prompt_compression":"caveman"}}
+{"run_id":"32574273068","timestamp":"2026-08-22T12:55:27.258Z","harness_version":"87110e7c96fd24eee920a67c3a72c1bf1450e62e788f948848ea5937daac158d:2e1df0801582987fdd3e068fd57e000ffac459e9747375b768dcbefe8e5f39fe","assignments":{"prompt_compression":"caveman"}}
