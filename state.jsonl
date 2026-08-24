@@ -21,3 +21,4 @@
 {"run_id":"32013821312","timestamp":"2026-08-17T09:10:41.065Z","assignments":{"prompt_style":"concise"}}
 {"run_id":"32119629232","timestamp":"2026-08-18T09:14:26.652Z","assignments":{"prompt_style":"concise"}}
 {"run_id":"32466476020","timestamp":"2026-08-21T09:09:54.301Z","assignments":{"prompt_style":"concise"}}
+{"run_id":"32708391068","timestamp":"2026-08-24T08:51:45.844Z","harness_version":"736e614b71546b1b0d345cf8b6bc68a7297d6f66ba59689791ffb207a403ca18:617e99c42a0bd4eb545b0e29e309dcc27ed4af6c74b5d693dae40b57314076e9","assignments":{"prompt_style":"concise"}}
