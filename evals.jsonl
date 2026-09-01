@@ -1,0 +1,2 @@
+{"id":"windows_integration_checked","question":"Did the agent assess the Windows CLI integration build and test workflow?","answer":"YES","model":"copilot/mai-code-1-flash-picker","timestamp":"2026-09-01T04:51:08.617Z","runid":"33471014717"}
+{"id":"failure_reported_or_noop","question":"Did the agent create an issue for an actionable integration failure, or use noop when no action was required?","answer":"UNKNOWN","model":"copilot/mai-code-1-flash-picker","timestamp":"2026-09-01T04:51:08.617Z","runid":"33471014717"}
