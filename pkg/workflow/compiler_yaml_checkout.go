@@ -91,9 +91,14 @@ func (c *Compiler) generateInitialAndCheckoutSteps(yaml *strings.Builder, data *
 // steps.checkout-app-token-{index}.outputs.token within the same job, just like the
 // github-mcp-app-token pattern.
 func (c *Compiler) generateAppTokenAndDefaultCheckoutSteps(yaml *strings.Builder, data *WorkflowData, checkoutMgr *CheckoutManager, needsCheckout bool) {
+	// When the default workspace checkout is not emitted, its app-token minting step
+	// must be skipped too: nothing references the token, so minting it would grant an
+	// unused token despite the user's explicit opt-out.
+	checkoutMgr.SetSkipDefaultCheckout(!needsCheckout)
+
 	if checkoutMgr.HasAppAuth() {
 		compilerYamlLog.Print("Generating checkout app token minting steps in agent job")
-		for _, step := range checkoutMgr.GenerateCheckoutAppTokenSteps(c, resolveCheckoutPermissions(data)) {
+		for _, step := range checkoutMgr.GenerateCheckoutAppTokenSteps(c, resolveCheckoutAppTokenPermissions(data)) {
 			yaml.WriteString(step)
 		}
 	}
