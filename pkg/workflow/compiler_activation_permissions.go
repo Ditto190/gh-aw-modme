@@ -38,6 +38,13 @@ func activationJobNeedsAppToken(ctx *activationJobBuildContext) bool {
 
 func buildActivationAppTokenPermissions(ctx *activationJobBuildContext) *Permissions {
 	appPerms := NewPermissions()
+	addActivationAppInteractionPermissions(appPerms, ctx)
+	addActivationAppLabelAndGuardrailPermissions(appPerms, ctx)
+	addActivationAppInferredPermissions(appPerms, ctx)
+	return appPerms
+}
+
+func addActivationAppInteractionPermissions(appPerms *Permissions, ctx *activationJobBuildContext) {
 	addActivationInteractionPermissions(
 		appPerms,
 		activationInteractionPermissionsOptions{
@@ -86,13 +93,9 @@ func buildActivationAppTokenPermissions(ctx *activationJobBuildContext) *Permiss
 			},
 		)
 	}
-	// Keep this aligned with addActivationLabelPermissions: app-token scopes are
-	// computed separately from GITHUB_TOKEN scopes because app-token permissions
-	// only apply to steps using the minted app token, while label permissions in
-	// addActivationLabelPermissions are only for GITHUB_TOKEN execution paths.
-	// This intentionally mirrors addActivationLabelPermissions without the
-	// ActivationGitHubApp == nil guard because this function runs only when
-	// activationJobNeedsAppToken confirms app-token minting is enabled.
+}
+
+func addActivationAppLabelAndGuardrailPermissions(appPerms *Permissions, ctx *activationJobBuildContext) {
 	if ctx.shouldRemoveLabel {
 		if slices.Contains(ctx.filteredLabelEvents, "issues") || slices.Contains(ctx.filteredLabelEvents, "pull_request") {
 			appPerms.Set(PermissionIssues, PermissionWrite)
@@ -107,15 +110,14 @@ func buildActivationAppTokenPermissions(ctx *activationJobBuildContext) *Permiss
 	if hasMaxDailyAICGuardrail(ctx.data) {
 		appPerms.Set(PermissionActions, PermissionRead)
 	}
-	// Add GitHub App-only permissions inferred from activation job gh CLI commands so the
-	// minted App token includes the scopes those commands require (e.g. codespaces: read
-	// for `gh codespace list`). Only App-only scopes are passed here.
+}
+
+func addActivationAppInferredPermissions(appPerms *Permissions, ctx *activationJobBuildContext) {
 	for scope, level := range ctx.activationInferredPerms {
 		if IsGitHubAppOnlyScope(scope) {
 			appPerms.Set(scope, level)
 		}
 	}
-	return appPerms
 }
 
 // buildActivationPermissions builds activation job permissions from workflow features and selected interactions.
@@ -142,6 +144,9 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 	if isSteeringIssueEnabled(ctx.data) {
 		permsMap[PermissionIssues] = PermissionWrite
 	}
+	if c.activationBlockedVersionIssueEnabled(ctx) {
+		permsMap[PermissionIssues] = PermissionWrite
+	}
 	addActivationInteractionPermissionsMap(permsMap, activationInteractionPermissionsOptions{
 		onSection:                         ctx.data.On,
 		hasReaction:                       ctx.hasReaction,
@@ -160,6 +165,48 @@ func (c *Compiler) buildActivationBasePermissions(ctx *activationJobBuildContext
 		permsMap[PermissionIdToken] = PermissionWrite
 	}
 	return permsMap
+}
+
+// activationBlockedVersionIssueEnabled reports whether the activation-stage
+// blocked-version check may create/update a notification issue, and is used
+// to conservatively grant issues: write at compile time. It reuses
+// conclusionReportFailureAsIssueEnabled, which only detects a literal "false"
+// for safe-outputs.report-failure-as-issue. It intentionally does NOT honor
+// that setting's category-filter arrays (ReportFailureAsIssueCategories /
+// ReportFailureAsIssueExcludedCategories, e.g. report-failure-as-issue:
+// ["!blocked_version"]): those categories describe failures detected by the
+// downstream conclusion job and are not available this early in the
+// workflow. A workflow that only wants to suppress blocked-version
+// notifications must set report-failure-as-issue to a literal false, or set
+// on.report-blocked-version: false (see ReportBlockedVersionDisabled), which
+// is a narrower toggle that only affects this notification and does not
+// disable check-for-updates or its hard failure.
+func (c *Compiler) activationBlockedVersionIssueEnabled(ctx *activationJobBuildContext) bool {
+	return !ctx.data.UpdateCheckDisabled && !ctx.data.ReportBlockedVersionDisabled && IsReleasedVersion(c.version) && conclusionReportFailureAsIssueEnabled(ctx.data)
+}
+
+// activationBlockedVersionReportAsIssueValue returns the templatable
+// report-failure-as-issue value to embed in the blocked-version check step's
+// environment. Unlike activationBlockedVersionIssueEnabled (used to
+// conservatively grant issues: write at compile time), this preserves runtime
+// expressions (e.g. "${{ inputs.report-failure-as-issue }}") instead of
+// collapsing them to a compile-time boolean, so the value is only resolved
+// once GitHub Actions evaluates the expression at runtime. Defaults to "true"
+// when report-failure-as-issue is unset. When on.report-blocked-version: false
+// is set in frontmatter, this always returns a literal "false", overriding any
+// report-failure-as-issue value, since that flag is a dedicated off-switch for
+// this notification.
+func activationBlockedVersionReportAsIssueValue(ctx *activationJobBuildContext) *string {
+	if ctx.data.ReportBlockedVersionDisabled {
+		v := "false"
+		return &v
+	}
+	if ctx.data.SafeOutputs == nil || ctx.data.SafeOutputs.ReportFailureAsIssue == nil {
+		v := "true"
+		return &v
+	}
+	v := ctx.data.SafeOutputs.ReportFailureAsIssue.String()
+	return &v
 }
 
 func (c *Compiler) addCentralizedCommandActivationPermissions(permsMap map[PermissionScope]PermissionLevel, ctx *activationJobBuildContext) {
