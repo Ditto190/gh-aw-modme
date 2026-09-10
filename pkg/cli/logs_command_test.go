@@ -485,7 +485,98 @@ func TestResolveLogsWorkflowTargetCrossRepo(t *testing.T) {
 	target, err := resolveLogsWorkflowTarget(cmd, "other-org/other-repo/.github/workflows/daily-report.yml")
 	require.NoError(t, err)
 	assert.Equal(t, "other-org/other-repo", target.repoOverride)
-	assert.Equal(t, "daily-report.yml", target.workflowName)
+	assert.Equal(t, "daily-report", target.workflowName)
+}
+
+func TestResolveLogsWorkflowTargetCrossRepoUsesLocalResolution(t *testing.T) {
+	workflowsDir := filepath.Join(t.TempDir(), ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowsDir, 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(workflowsDir, "self-care-open-source-failures.md"),
+		[]byte("---\nname: SelfCare / Open Source Failures\n---\n"),
+		0o644,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(workflowsDir, "self-care-open-source-failures.lock.yml"),
+		[]byte("name: SelfCare / Open Source Failures\non: push\n"),
+		0o644,
+	))
+	t.Setenv("GITHUB_REPOSITORY", "githubnext/gh-aw-cao")
+	t.Setenv("GH_AW_WORKFLOWS_DIR", workflowsDir)
+
+	tests := []struct {
+		name         string
+		input        string
+		expectedRepo string
+		expectedName string
+	}{
+		{
+			name:         "workflow ID",
+			input:        "githubnext/gh-aw-cao/self-care-open-source-failures",
+			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
+			name:         "markdown filename",
+			input:        "githubnext/gh-aw-cao/self-care-open-source-failures.md",
+			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
+			name:         "lock filename",
+			input:        "githubnext/gh-aw-cao/self-care-open-source-failures.lock.yml",
+			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
+			name:         "full lock path",
+			input:        "githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
+			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
+			name:         "full workflow file path",
+			input:        "githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.yml",
+			expectedRepo: "githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
+			name:         "matching host full lock path",
+			input:        "github.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
+			expectedRepo: "github.com/githubnext/gh-aw-cao",
+			expectedName: "SelfCare / Open Source Failures",
+		},
+		{
+			// A same-named repository on another host must not inherit the local
+			// workflow display name.
+			name:         "other host full lock path",
+			input:        "github.example.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.lock.yml",
+			expectedRepo: "github.example.com/githubnext/gh-aw-cao",
+			expectedName: "self-care-open-source-failures",
+		},
+		{
+			name:         "other host full workflow file path",
+			input:        "github.example.com/githubnext/gh-aw-cao/.github/workflows/self-care-open-source-failures.yml",
+			expectedRepo: "github.example.com/githubnext/gh-aw-cao",
+			expectedName: "self-care-open-source-failures",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewLogsCommand()
+			target, err := resolveLogsWorkflowTarget(cmd, tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedRepo, target.repoOverride)
+			assert.Equal(t, tt.expectedName, target.workflowName)
+		})
+	}
+
+	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("repo", "githubnext/gh-aw-cao"))
+	target, err := resolveLogsWorkflowTarget(cmd, "self-care-open-source-failures.lock.yml")
+	require.NoError(t, err)
+	assert.Equal(t, "SelfCare / Open Source Failures", target.workflowName)
 }
 
 func TestResolveRemoteLogsWorkflowTargets(t *testing.T) {
