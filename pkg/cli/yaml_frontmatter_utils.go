@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -109,7 +110,7 @@ func findAndReplaceInLine(line, oldKey, newKey string) (string, bool) {
 // The transform function receives the frontmatter lines and returns the modified lines
 // and a boolean indicating whether any changes were made.
 func applyFrontmatterLineTransform(content string, transform func([]string) ([]string, bool)) (string, bool, error) {
-	frontmatterLines, markdown, err := parseFrontmatterLines(content)
+	frontmatterLines, _, err := parseFrontmatterLines(content)
 	if err != nil {
 		return content, false, err
 	}
@@ -120,7 +121,17 @@ func applyFrontmatterLineTransform(content string, transform func([]string) ([]s
 	}
 
 	yamlUtilsLog.Print("Frontmatter transformation applied successfully")
-	return reconstructContent(result, markdown), true, nil
+	originalFrontmatter := strings.Join(frontmatterLines, "\n")
+	updatedFrontmatter := strings.Join(result, "\n")
+	firstNewline := strings.IndexByte(content, '\n')
+	if firstNewline < 0 {
+		return content, false, errors.New("unable to locate frontmatter text in workflow content")
+	}
+	frontmatterStart := firstNewline + 1
+	if !strings.HasPrefix(content[frontmatterStart:], originalFrontmatter) {
+		return content, false, errors.New("unable to locate frontmatter text in workflow content")
+	}
+	return content[:frontmatterStart] + updatedFrontmatter + content[frontmatterStart+len(originalFrontmatter):], true, nil
 }
 
 // removeParentBlockIfTrulyEmpty removes a bare "parentBlock:" header line only
@@ -168,6 +179,8 @@ func removeParentBlockIfTrulyEmpty(lines []string, parentBlock string) []string 
 // even comments), the parent block line is also removed to avoid a dangling
 // "parentBlock:" key (which YAML parses as null).
 // Returns the modified lines and whether any changes were made.
+//
+//nolint:largefunc
 func removeFieldFromBlock(lines []string, fieldName string, parentBlock string) ([]string, bool) {
 	var result []string
 	var modified bool
