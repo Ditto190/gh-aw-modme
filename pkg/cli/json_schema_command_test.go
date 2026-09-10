@@ -92,6 +92,44 @@ func TestJSONSchemaCommand(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "logs-jsonl",
+			schemaName: "logs-jsonl",
+			oneOfCount: 3,
+			validOutput: []any{
+				cachedLogsJSONLRunItemSchema{
+					SchemaVersion: cachedLogsJSONLSchemaVersion,
+					Kind:          cachedLogsJSONLKindRun,
+					Run:           RunData{RunID: 42},
+				},
+				map[string]any{
+					"schema_version": cachedLogsJSONLSchemaVersion,
+					"kind":           cachedLogsJSONLKindWorkflowRuns,
+					"request": cachedWorkflowRunsRequest{
+						Host:       "github.com",
+						Repository: "github/gh-aw",
+						Args:       []string{"run", "list"},
+					},
+					"payload": []any{map[string]any{
+						"databaseId": 42, "number": 7,
+						"url":    "https://github.com/github/gh-aw/actions/runs/42",
+						"status": "completed", "conclusion": "success", "workflowName": "Daily report",
+						"createdAt": "2026-09-01T10:00:00Z", "startedAt": "2026-09-01T10:00:01Z",
+						"updatedAt": "2026-09-01T10:02:00Z", "event": "schedule", "headBranch": "main",
+						"headSha": "abc123", "displayTitle": "Daily report", "attempt": 1,
+						"futureField": map[string]any{"nested": true},
+					}},
+				},
+				cachedLogsJSONLRateLimitItemSchema{
+					SchemaVersion: cachedLogsJSONLSchemaVersion,
+					Kind:          cachedLogsJSONLKindRateLimit,
+					RateLimit: GitHubAPIRateLimitReport{
+						Host:  "github.com",
+						Start: &GitHubAPIRateLimitState{Limit: 5000, Remaining: 4999},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -196,7 +234,7 @@ func TestJSONSchemaCommandRejectsInvalidArguments(t *testing.T) {
 func TestGeneratedOutputSchemasAreCurrent(t *testing.T) {
 	t.Parallel()
 
-	for _, schemaName := range []string{"audit", "logs"} {
+	for _, schemaName := range []string{"audit", "logs", "logs-jsonl"} {
 		t.Run(schemaName, func(t *testing.T) {
 			t.Parallel()
 
