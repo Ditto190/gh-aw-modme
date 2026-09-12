@@ -7,9 +7,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.29.0<br>
+**Version**: 1.29.3<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-09-02<br>
+**Publication Date**: 2026-09-12<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -2715,6 +2715,7 @@ This section provides complete definitions for all remaining safe output types. 
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 1)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repo allowlist
 - `staged`: Staged mode override
@@ -2725,6 +2726,16 @@ This section provides complete definitions for all remaining safe output types. 
 - Label values MUST be validated against repository labels before application
 - Cross-repository targets MUST be validated against the `allowed-repos` allowlist
 - Issue number MUST be validated as a positive integer belonging to the target repository
+
+**UI-001**: If `target` is omitted, the processor MUST interpret it as `target: "triggering"`.
+
+**UI-002**: For `target: "triggering"`, the processor MUST use only the issue number from trusted triggering-event context and MUST ignore any agent-supplied `issue_number`.
+
+**UI-003**: For a fixed numeric `target`, the processor MUST use the configured issue number and MUST ignore any conflicting agent-supplied `issue_number`.
+
+**UI-004**: Only `target: "*"` MAY select an issue from the agent-supplied `issue_number`.
+
+**UI-005**: Schema shaping, prompt instructions, and temporary-ID resolution MUST NOT replace or precede runtime target authorization. Agent-supplied target identifiers, including unresolved temporary IDs, MUST be ignored unless `target` is `"*"`.
 
 **Required Permissions**:
 
@@ -3594,6 +3605,14 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 - Requires both `issues: write` and `pull-requests: write` to support labeling both entity types
 - Labels must exist in repository; non-existent labels generate warnings
 
+**Target Authorization Requirements**:
+
+- **AL-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
+- **AL-002**: With `target: "triggering"`, the handler MUST use only the issue or pull request number from trusted triggering-event context. It MUST ignore agent-supplied `item_number` and equivalent aliases.
+- **AL-003**: With a fixed numeric `target`, the handler MUST use the configured number whether or not the agent supplies an item number. It MUST ignore conflicting agent-supplied target identifiers.
+- **AL-004**: Only `target: "*"` MAY select an issue or pull request from an agent-supplied `item_number` or equivalent alias.
+- **AL-005**: The privileged handler MUST enforce AL-001 through AL-004 at runtime. Agent-facing schema shaping or prompt instructions MAY reduce invalid requests but MUST NOT replace runtime enforcement.
+
 ---
 
 #### Type: remove_labels
@@ -3621,6 +3640,14 @@ For all Linear types, GraphQL source, endpoint, protocol, and host are implement
 
 - Same permissions as `add_labels`
 - Missing labels are silently ignored (no error)
+
+**Target Authorization Requirements**:
+
+- **RML-001**: An omitted `target` configuration MUST be interpreted as `target: "triggering"`.
+- **RML-002**: With `target: "triggering"`, the handler MUST use only the issue or pull request number from trusted triggering-event context. It MUST ignore agent-supplied `item_number` and equivalent aliases.
+- **RML-003**: With a fixed numeric `target`, the handler MUST use the configured number whether or not the agent supplies an item number. It MUST ignore conflicting agent-supplied target identifiers.
+- **RML-004**: Only `target: "*"` MAY select an issue or pull request from an agent-supplied `item_number` or equivalent alias.
+- **RML-005**: The privileged handler MUST enforce RML-001 through RML-004 at runtime.
 
 ---
 
@@ -5606,6 +5633,21 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.29.3** (2026-09-12):
+
+- **Specified**: Runtime target authorization for `update_issue`, including wildcard-only resolution of agent-supplied temporary issue IDs.
+- **Updated**: Publication metadata to 1.29.3.
+
+**Version 1.29.2** (2026-09-12):
+
+- **Specified**: Runtime target authorization for `remove_labels`, matching `add_labels`: omitted and explicit `triggering` targets are restricted to trusted event context, fixed numeric targets override agent output, and only wildcard targets may use agent-supplied item numbers.
+- **Updated**: Publication metadata to 1.29.2.
+
+**Version 1.29.1** (2026-09-12):
+
+- **Specified**: Runtime target authorization for `add_labels`. Omitted and explicit `triggering` targets are restricted to trusted event context, fixed numeric targets override agent output, and only wildcard targets may use agent-supplied item numbers.
+- **Updated**: Publication metadata to 1.29.1.
 
 **Version 1.29.0** (2026-09-02):
 

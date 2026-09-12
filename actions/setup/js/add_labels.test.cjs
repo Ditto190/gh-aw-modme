@@ -112,8 +112,100 @@ describe("add_labels", () => {
   });
 
   describe("handleAddLabels", () => {
+    describe("AL-005 runtime target authorization", () => {
+      it("AL-002 ignores a conflicting item_number when target is triggering", async () => {
+        const handler = await main({ max: 10, target: "triggering" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(addLabelsCalls[0].issue_number).toBe(123);
+      });
+
+      it("AL-001 defaults to the triggering item when target is omitted", async () => {
+        const handler = await main({ max: 10 });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(123);
+        expect(addLabelsCalls[0].issue_number).toBe(123);
+      });
+
+      it("AL-003 ignores a conflicting item_number when target is a fixed number", async () => {
+        const handler = await main({ max: 10, target: "789" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(789);
+        expect(addLabelsCalls[0].issue_number).toBe(789);
+      });
+
+      it("AL-003 uses a fixed numeric target without an item_number", async () => {
+        const handler = await main({ max: 10, target: "789" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(789);
+        expect(addLabelsCalls[0].issue_number).toBe(789);
+      });
+
+      it.each([-1, 1.5, Infinity])("rejects invalid fixed target %s", async target => {
+        const handler = await main({ max: 10, target });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ labels: ["bug"] }, {});
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe("Invalid issue/PR number");
+        expect(addLabelsCalls).toHaveLength(0);
+      });
+
+      it("AL-004 accepts item_number when target is wildcard", async () => {
+        const handler = await main({ max: 10, target: "*" });
+        const addLabelsCalls = [];
+        mockGithub.rest.issues.addLabels = async params => {
+          addLabelsCalls.push(params);
+          return {};
+        };
+
+        const result = await handler({ item_number: 456, labels: ["bug"] }, {});
+
+        expect(result.success).toBe(true);
+        expect(result.number).toBe(456);
+        expect(addLabelsCalls[0].issue_number).toBe(456);
+      });
+    });
+
     it("should add labels to an issue using explicit item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];
 
       mockGithub.rest.issues.addLabels = async params => {
@@ -138,7 +230,7 @@ describe("add_labels", () => {
     });
 
     it("should accept structured label entries and add normalized label names", async () => {
-      const handler = await main({ max: 10, issue_intent: true });
+      const handler = await main({ max: 10, target: "*", issue_intent: true });
       const graphqlMutationCalls = [];
 
       const originalGraphql = mockGithub.graphql;
@@ -291,7 +383,7 @@ describe("add_labels", () => {
     });
 
     it("should report a confidence-gated intent label as suggested rather than added", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       mockGithub.rest.issues.get = async () => ({
         data: {
@@ -460,7 +552,7 @@ describe("add_labels", () => {
     });
 
     it("should accept issue_number as an alias for item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];
 
       mockGithub.rest.issues.addLabels = async params => {
@@ -482,7 +574,7 @@ describe("add_labels", () => {
     });
 
     it("should accept pr_number as an alias for item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];
 
       mockGithub.rest.issues.addLabels = async params => {
@@ -504,7 +596,7 @@ describe("add_labels", () => {
     });
 
     it("should accept pull_number as an alias for item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];
 
       mockGithub.rest.issues.addLabels = async params => {
@@ -609,7 +701,7 @@ describe("add_labels", () => {
     });
 
     it("should handle invalid item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler(
         {
@@ -969,7 +1061,7 @@ describe("add_labels", () => {
     });
 
     it("should fall back to the REST add-labels endpoint for PRs when using issue_intent (pull_request field)", async () => {
-      const handler = await main({ max: 10, issue_intent: true });
+      const handler = await main({ max: 10, target: "*", issue_intent: true });
       const graphqlMutationCalls = [];
       const addLabelsCalls = [];
 
@@ -1013,7 +1105,7 @@ describe("add_labels", () => {
     });
 
     it("should fall back to the REST add-labels endpoint for PRs when node_id starts with PR_", async () => {
-      const handler = await main({ max: 10, issue_intent: true });
+      const handler = await main({ max: 10, target: "*", issue_intent: true });
       const graphqlMutationCalls = [];
       const addLabelsCalls = [];
 
@@ -1267,7 +1359,7 @@ describe("add_labels", () => {
     });
 
     it("should resolve temporary ID in item_number to real issue number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];
 
       mockGithub.rest.issues.addLabels = async params => {
@@ -1290,7 +1382,7 @@ describe("add_labels", () => {
     });
 
     it("should defer when item_number is an unresolved temporary ID", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
 
       const result = await handler(
         {
@@ -1306,7 +1398,7 @@ describe("add_labels", () => {
     });
 
     it("should resolve temporary ID with hash prefix in item_number", async () => {
-      const handler = await main({ max: 10 });
+      const handler = await main({ max: 10, target: "*" });
       const addLabelsCalls = [];
 
       mockGithub.rest.issues.addLabels = async params => {
@@ -1328,7 +1420,7 @@ describe("add_labels", () => {
     });
 
     it("should preview labels in staged mode without calling API", async () => {
-      const handler = await main({ max: 10, staged: true });
+      const handler = await main({ max: 10, target: "*", staged: true });
       const addLabelsCalls = [];
 
       mockGithub.rest.issues.addLabels = async params => {
