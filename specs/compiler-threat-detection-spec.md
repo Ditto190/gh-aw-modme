@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.34
+**Version**: 1.0.35
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,6 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw | Compatibility |
 |---|---:|---|
+| `1.0.35` | `v0.87.9` | Audit-only; #681/#678/#676/#675, #679, #674/#669/#668/#667, #663, #657, #652/#651, and #680 are not new threat classes. |
 | `1.0.34` | `v0.87.9` | Adds CTR-027; allowlisted bot synchronization requires trusted same-repository provenance. |
 | `1.0.33` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
 | `1.0.32` | `v0.87.9` | Audit-only; no new CTR rule or lock-file schema change. |
@@ -154,21 +155,9 @@ Every active rule MUST map to implementation and test coverage. References are p
 | CTR-026 Generated Job Timeout Expression Injection | custom-job properties and timeout resolution | custom-job and timeout tests |
 | CTR-027 Allowlisted Bot Synchronization Provenance | `actions/setup/js/check_membership.cjs`, `actions/setup/js/check_permissions_utils.cjs` | `actions/setup/js/check_membership.test.cjs`, `actions/setup/js/check_permissions_utils.test.cjs` |
 
-### 7.3 Mapping Audit (2026-09-11)
+### 7.2 Mapping Audit History
 
-Issue #59894 (`[sighthound] Security findings in github/gh-aw`) reported a Critical CWE-78 command-injection finding claiming untrusted `commentBody`/`params` reach `exec` in `actions/setup/js/close_issue.cjs` (and a `pkg/workflow/js/close_issue.cjs` mirror) around lines 5 and 1110. Verification against conformance scope found this to be a false positive: `close_issue.cjs` is 402 lines total (no line 1110 exists), contains no `exec`/`child_process`/`spawn` call anywhere, and `pkg/workflow/js/close_issue.cjs` does not exist in the repository. `commentBody` in `close_entity_helpers.cjs` flows only into the authenticated GitHub API client (`callbacks.addComment`), never into a shell or subprocess argument, so CTR-006 (Template Injection) and CTR-013 (Argument Injection via Package/Image Names) triggers do not apply and no new `CTR-*` rule is warranted. No `threat-detection-suppress` annotation was added because the finding does not correspond to any real code path the compiler needs to suppress — it is an inapplicable external scan result about nonexistent code, not an active false-positive-prone compiler rule.
-
-Open high/critical code-scanning alerts (#675–#677 `go/allocation-size-overflow`) remain unchanged from the 2026-09-10 audit disposition: in-process, schema-validated capacity-hint computations, not exploitable by untrusted input. No live `threat-detection-suppress` annotation exists in any workflow frontmatter. No compiler/parser source diff exists beyond the single squashed commit state, so no candidate threat surfaced from source changes.
-
-CTR-027 records the runtime pre-activation control for allowlisted bots that synchronize PRs they did not open. The allowlist alone MUST NOT override confused-deputy protection. Authorization is permitted only for `pull_request` or `pull_request_target` `synchronize` events when repository IDs match (or the head repository name matches the base repository if IDs are unavailable), the original PR author satisfies `on.roles`, the bot is installed and active, and the actor is not `dependabot[bot]`. Missing provenance, fork PRs, untrusted authors, inactive bots, and Dependabot author mismatches fail closed. The implementation logs the decision inputs and trust outcome without logging credentials or event payload contents.
-
-### 7.2 Mapping Audit (2026-09-10)
-
-CTR-001–026 have implementation and test references with no `TODO` placeholders. The available repository history is a single squashed commit (`099efdd`, dated 2026-09-09 17:19 -0700); no additional compiler/parser diff exists beyond that state, so no new candidate threat surfaced from source changes. No live `threat-detection-suppress` annotation exists in any workflow frontmatter (only illustrative documentation examples in `.github/aw/syntax-agentic.md` and reference docs), so no `SLA_BREACH` applies.
-
-Open high/critical code-scanning alerts were reviewed against conformance scope: alert #677 (`go/allocation-size-overflow` in `pkg/workflow/mcp_setup_generator.go`) was already assessed in the 2026-09-09 audit as an in-process, schema-validated map capacity computation, not a new compiler threat class. Alerts #675–#676 (`go/allocation-size-overflow` in `pkg/workflow/mcp_github_config.go`) are the same class of finding — capacity hints computed from already-bounded, schema-validated slice/map lengths (`dynamicEnclaveGitHubGuardRepos`, `staticEnclaveGitHubGuardPolicies`) — and are not exploitable by untrusted input; no CTR rule applies. Alerts #667–#669 and #674 (`go/bad-redirect-check`) flag `strings.HasPrefix` path-containment guards in `pkg/cli/add_package_manifest_imports.go`, `pkg/cli/add_package_manifest_includes.go`, and `pkg/workflow/graders_config.go`; these are manifest path-traversal guards, not HTTP redirect validators, and already carry in-code rationale comments explaining the CodeQL heuristic mismatch. Other reviewed alerts (`js/http-to-file-access`, `workflow-security-finding-1`, `workflow-out-of-context`, `workflow-go-graphql-injection-sprintf`) are outside `pkg/workflow/`, `pkg/parser/`, and `actions/setup/` conformance scope per Section 1.
-
-Historical audits through 2026-09-09 confirmed existing coverage or recorded mapping-only updates for CTR-001, CTR-004–007, CTR-009–012, CTR-016–021, CTR-023, and CTR-025; no audit added an uncovered threat class.
+Dated mapping-audit records are maintained in `specs/compiler-threat-detection-changelog.md`. A daily optimizer run MUST append its audit entry to that changelog, not to this specification.
 
 ## 8. Compliance Testing
 
@@ -227,16 +216,4 @@ A test ID that is deprecated under Section 5.4 MUST remain listed in Section 8.1
 
 ## 10. Change Log
 
-| Version | Change |
-|---|---|
-| 1.0.34 | Added CTR-027 for trusted same-repository allowlisted bot synchronization and fail-closed confused-deputy handling. |
-| 1.0.33 | Audit-only review; issue #59894's `close_issue.cjs` command-injection claim is a false positive (no `exec`/subprocess call exists in the file). |
-| 1.0.32 | Audit-only review; #675–677 and #667–669/#674 are not new threat classes. |
-| 1.0.31 | Audit-only review; #672 is not a new threat class. |
-| 1.0.30–1.0.27 | CTR-001, CTR-004, and CTR-006 mapping synchronization. |
-| 1.0.26 | Added CTR-026 timeout-expression rejection. |
-| 1.0.25–1.0.23 | Added CTR-025 and mapping-only audit updates. |
-| 1.0.22 | Added suppression and optimizer-failure requirements. |
-| 1.0.20–1.0.15 | Added CTR-022, CTR-023, and CTR-021. |
-| 1.0.14–1.0.8 | Added CTR-020, CTR-019, CTR-018, CTR-017, and CTR-016. |
-| 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
+The version history for this specification is maintained in `specs/compiler-threat-detection-changelog.md`. A version change MUST add an entry there in the same pull request that updates Section 2.
