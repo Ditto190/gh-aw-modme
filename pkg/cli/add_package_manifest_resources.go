@@ -68,6 +68,11 @@ func parseManifestResourceMapping(mapping map[string]any, manifestPath string) (
 
 func validateManifestResourceDestination(destination string) error {
 	switch {
+	case strings.HasPrefix(destination, constants.WorkflowsDirSlash+"shared/"):
+		if !isSharedWorkflowScriptDestination(destination) {
+			return errorsForResourceDestination()
+		}
+		return nil
 	case strings.HasPrefix(destination, constants.GithubDir+"ISSUE_TEMPLATE/"):
 		remaining := strings.TrimPrefix(destination, constants.GithubDir+"ISSUE_TEMPLATE/")
 		if remaining == "" || strings.Contains(remaining, "/") {
@@ -92,7 +97,7 @@ func validateManifestResourceDestination(destination string) error {
 }
 
 func errorsForResourceDestination() error {
-	return errors.New("destinations must be .github/CODEOWNERS, .github/ISSUE_TEMPLATE/*.yml, .github/ISSUE_TEMPLATE/*.yaml, or under .github/aw/")
+	return errors.New("destinations must be .github/CODEOWNERS, .github/ISSUE_TEMPLATE/*.yml, .github/ISSUE_TEMPLATE/*.yaml, .github/workflows/shared/**/*.mjs, .github/workflows/shared/**/*.cjs, or under .github/aw/")
 }
 
 func normalizePackageResourcePaths(resources []repositoryPackageResource, packagePath string) []resolvedPackageResource {
