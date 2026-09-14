@@ -38,8 +38,10 @@ describe("update_release", () => {
           getReleaseByTag: vi.fn(),
           updateRelease: vi.fn(),
           getRelease: vi.fn(),
+          listReleases: vi.fn(),
         },
       },
+      paginate: vi.fn().mockImplementation(async () => []),
     };
 
     mockContext = {
@@ -60,6 +62,7 @@ describe("update_release", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     global.core = originalGlobals.core;
     global.github = originalGlobals.github;
     global.context = originalGlobals.context;
@@ -179,9 +182,103 @@ describe("update_release", () => {
   });
 
   it("should handle release not found error", async () => {
-    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(new Error("Not Found"));
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
 
-    await expect(evalHandler({}, { tag: "v99.99.99", operation: "replace", body: "New notes" })).rejects.toThrow("Release with tag 'v99.99.99' not found");
+    await expect(evalHandler({}, { tag: "v99.99.99", operation: "replace", body: "New notes" })).rejects.toThrow(
+      "ERR_VALIDATION: No GitHub Release exists for tag 'v99.99.99' in test-owner/test-repo (checked published and draft releases). A Git tag alone is not enough; create the release at https://github.com/test-owner/test-repo/releases/new?tag=v99.99.99, then retry."
+    );
+    expect(mockGithub.paginate).toHaveBeenCalledWith(mockGithub.rest.repos.listReleases, expect.objectContaining({ owner: "test-owner", repo: "test-repo" }), expect.any(Function));
+  });
+
+  it("should fall back to a draft release when the tag lookup 404s", async () => {
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
+
+    const draftRelease = {
+      id: 42,
+      tag_name: "v0.0.8",
+      draft: true,
+      body: "Draft notes",
+      html_url: "https://github.com/test-owner/test-repo/releases/tag/untagged-abc123",
+    };
+    mockGithub.paginate.mockImplementation(async (_method, _params, callback) => {
+      if (callback) {
+        const done = vi.fn();
+        callback({ data: [{ id: 1, tag_name: "v0.0.1" }, draftRelease] }, done);
+      }
+      return [draftRelease];
+    });
+    mockGithub.rest.repos.updateRelease.mockResolvedValue({ data: { ...draftRelease, body: "Draft notes\n\nNew notes", html_url: draftRelease.html_url } });
+
+    const result = await evalHandler({}, { tag: "v0.0.8", operation: "append", body: "New notes" });
+
+    expect(mockGithub.rest.repos.updateRelease).toHaveBeenCalledWith(expect.objectContaining({ release_id: 42 }));
+    expect(result.tag).toBe("v0.0.8");
+  });
+
+  it("should report a missing release when no draft matches either", async () => {
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
+    mockGithub.paginate.mockImplementation(async (_method, _params, callback) => {
+      if (callback) {
+        const done = vi.fn();
+        callback({ data: [{ id: 1, tag_name: "v0.0.1" }] }, done);
+      }
+      return [];
+    });
+
+    await expect(evalHandler({}, { tag: "v0.0.8", operation: "replace", body: "New notes" })).rejects.toThrow("ERR_VALIDATION: No GitHub Release exists for tag 'v0.0.8' in test-owner/test-repo (checked published and draft releases).");
+  });
+
+  it("should still report the missing-release diagnostic when the draft search itself fails", async () => {
+    const notFoundError = new Error("Not Found");
+    notFoundError.status = 404;
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValue(notFoundError);
+    const forbiddenError = new Error("Forbidden");
+    forbiddenError.status = 403;
+    mockGithub.paginate.mockRejectedValue(forbiddenError);
+
+    await expect(evalHandler({}, { tag: "v0.0.8", operation: "replace", body: "New notes" })).rejects.toThrow(
+      "ERR_VALIDATION: No GitHub Release exists for tag 'v0.0.8' in test-owner/test-repo (checked published and draft releases). A Git tag alone is not enough; create the release at https://github.com/test-owner/test-repo/releases/new?tag=v0.0.8, then retry. Draft releases could not be checked (the search itself failed, possibly due to insufficient permissions); if a draft release exists, verify the token has push access to this repository."
+    );
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("Could not search draft releases for tag 'v0.0.8'"));
+  });
+
+  it("should retry transient release lookup failures", async () => {
+    vi.useFakeTimers();
+    const transientError = new Error("503 Service Unavailable");
+    const mockRelease = {
+      id: 1,
+      tag_name: "v1.0.0",
+      body: "Old release notes",
+      html_url: "https://github.com/test-owner/test-repo/releases/tag/v1.0.0",
+    };
+    mockGithub.rest.repos.getReleaseByTag.mockRejectedValueOnce(transientError).mockResolvedValue({ data: mockRelease });
+    mockGithub.rest.repos.updateRelease.mockResolvedValue({ data: mockRelease });
+
+    const resultPromise = evalHandler({}, { tag: "v1.0.0", operation: "replace", body: "New notes" });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(mockGithub.rest.repos.getReleaseByTag).toHaveBeenCalledTimes(2);
+    expect(result.tag).toBe("v1.0.0");
+  });
+
+  it("should report an update API 404 as an API error", async () => {
+    const mockRelease = {
+      id: 1,
+      tag_name: "v1.0.0",
+      body: "Old release notes",
+      html_url: "https://github.com/test-owner/test-repo/releases/tag/v1.0.0",
+    };
+    mockGithub.rest.repos.getReleaseByTag.mockResolvedValue({ data: mockRelease });
+    mockGithub.rest.repos.updateRelease.mockRejectedValue(new Error("Not Found"));
+
+    await expect(evalHandler({}, { tag: "v1.0.0", operation: "replace", body: "New notes" })).rejects.toThrow("ERR_API: Failed to update release with tag v1.0.0: Not Found");
   });
 
   it("should wrap generic API errors with ERR_API prefix", async () => {
