@@ -74,7 +74,52 @@ func GenerateNamedOutputSchema(name string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate %s schema: %w", name, err)
 	}
+	fixCreatedItemIDSchema(schema)
 	return MarshalOutputSchema(schema)
+}
+
+// fixCreatedItemIDSchema walks the generated schema tree and narrows any
+// "id" property that was inferred as an unconstrained schema (from a Go
+// `any` field, e.g. CreatedItemReport.ID) down to the set of concrete types
+// that safe-output handlers actually populate: a numeric database ID
+// (GitHub) or a string identifier (Jira, Linear, etc.).
+func fixCreatedItemIDSchema(schema *jsonschema.Schema) {
+	if schema == nil {
+		return
+	}
+	if id, ok := schema.Properties["id"]; ok && isUnconstrainedSchema(id) {
+		id.Types = []string{"string", "integer"}
+	}
+	for name, child := range schema.Properties {
+		if name == "id" {
+			continue
+		}
+		fixCreatedItemIDSchema(child)
+	}
+	if schema.Items != nil {
+		fixCreatedItemIDSchema(schema.Items)
+	}
+	for _, child := range schema.ItemsArray {
+		fixCreatedItemIDSchema(child)
+	}
+	if schema.AdditionalProperties != nil {
+		fixCreatedItemIDSchema(schema.AdditionalProperties)
+	}
+	for _, child := range schema.OneOf {
+		fixCreatedItemIDSchema(child)
+	}
+	for _, child := range schema.AnyOf {
+		fixCreatedItemIDSchema(child)
+	}
+	for _, child := range schema.AllOf {
+		fixCreatedItemIDSchema(child)
+	}
+}
+
+// isUnconstrainedSchema reports whether a schema imposes no type constraint,
+// which is how jsonschema-go represents a Go `any`/`interface{}` field.
+func isUnconstrainedSchema(schema *jsonschema.Schema) bool {
+	return schema != nil && schema.Type == "" && schema.Types == nil
 }
 
 type cachedLogsJSONLRunItemSchema struct {
@@ -113,6 +158,12 @@ type cachedLogsJSONLRateLimitItemSchema struct {
 	RateLimit     GitHubAPIRateLimitReport `json:"rate_limit"`
 }
 
+type cachedLogsJSONLSafeOutputItemSchema struct {
+	SchemaVersion int                          `json:"schema_version"`
+	Kind          string                       `json:"kind"`
+	SafeOutput    cachedLogsJSONLSafeOutputRow `json:"safe_output"`
+}
+
 func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	run, err := GenerateOutputSchema[cachedLogsJSONLRunItemSchema]()
 	if err != nil {
@@ -142,7 +193,13 @@ func generateLogsJSONLItemSchema() (*jsonschema.Schema, error) {
 	}
 	rateLimit.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
 	rateLimit.Properties["kind"].Enum = []any{cachedLogsJSONLKindRateLimit}
-	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{run, workflowRuns, rateLimit}}, nil
+	safeOutput, err := GenerateOutputSchema[cachedLogsJSONLSafeOutputItemSchema]()
+	if err != nil {
+		return nil, err
+	}
+	safeOutput.Properties["schema_version"].Enum = []any{cachedLogsJSONLSchemaVersion}
+	safeOutput.Properties["kind"].Enum = []any{cachedLogsJSONLKindSafeOutput}
+	return &jsonschema.Schema{OneOf: []*jsonschema.Schema{run, workflowRuns, rateLimit, safeOutput}}, nil
 }
 
 func generateAuditOutputSchema() (*jsonschema.Schema, error) {

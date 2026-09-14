@@ -145,6 +145,22 @@ describe("safe_output_manifest", () => {
       expect(entry.metadata).toEqual({ review_id: 10, review_event: "APPROVE" });
     });
 
+    it("should persist provider-neutral identity and label target details", () => {
+      const log = createManifestLogger(testManifestFile);
+      log({
+        type: "add_labels",
+        provider: "github",
+        repo: "owner/repo",
+        number: 7,
+        target: { provider: "github", repository: "owner/repo", number: 7, kind: "pull_request" },
+        labels: [{ name: "bug", database_id: 42, node_id: "LA_kwDO" }],
+      });
+
+      const entry = JSON.parse(fs.readFileSync(testManifestFile, "utf8").trim());
+      expect(entry.target).toEqual({ provider: "github", repository: "owner/repo", number: 7, kind: "pull_request" });
+      expect(entry.labels).toEqual([{ name: "bug", database_id: 42, node_id: "LA_kwDO" }]);
+    });
+
     it("should persist label outcomes even when empty", () => {
       const log = createManifestLogger(testManifestFile);
       log({ type: "add_labels", number: 20875, labelsAdded: [], labelsSuggested: [] });
@@ -208,6 +224,51 @@ describe("safe_output_manifest", () => {
       expect(() => JSON.parse(lines[0])).not.toThrow();
     });
 
+    it("should redact secret values even when JSON-escaped by quotes or backslashes", () => {
+      global.core = { info: () => {}, warning: () => {} };
+      process.env.GH_AW_SECRET_NAMES = "CUSTOM_TEST";
+      process.env.SECRET_CUSTOM_TEST = 'my"secret\\value';
+
+      const log = createManifestLogger(testManifestFile);
+      log({ type: "create_issue", url: "https://github.com/owner/repo/issues/1", metadata: { note: 'contains my"secret\\value here' } });
+
+      const content = fs.readFileSync(testManifestFile, "utf8");
+      expect(content).not.toContain('my\\"secret\\\\value');
+      expect(content).toContain("***REDACTED***");
+
+      delete global.core;
+      delete process.env.GH_AW_SECRET_NAMES;
+      delete process.env.SECRET_CUSTOM_TEST;
+    });
+
+    it("should warn and fall back to minimal fields when redaction fails, without leaking other fields", () => {
+      const warnings = [];
+      global.core = { info: () => {}, warning: message => warnings.push(message) };
+
+      const log = createManifestLogger(testManifestFile);
+      // A circular metadata object makes the recursive redaction walk blow the call
+      // stack, forcing the logger's redaction catch branch to run.
+      const circular = { secretLookingField: "should-not-leak" };
+      circular.self = circular;
+      log({
+        type: "create_issue",
+        number: 7,
+        provider: "github",
+        repo: "owner/repo",
+        url: "https://github.com/owner/repo/issues/7",
+        metadata: circular,
+      });
+
+      const content = fs.readFileSync(testManifestFile, "utf8");
+      const entry = JSON.parse(content.trim());
+      expect(entry).toEqual({ type: "create_issue", provider: "github", number: 7, timestamp: entry.timestamp });
+      expect(content).not.toContain("should-not-leak");
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("create_issue");
+
+      delete global.core;
+    });
+
     it("should throw when the manifest file cannot be written", () => {
       // Create a directory where the file should be to force a write error
       fs.mkdirSync(testManifestFile, { recursive: true });
@@ -253,7 +314,52 @@ describe("safe_output_manifest", () => {
         url: "https://github.com/owner/repo/issues/42",
         number: 42,
         repo: "owner/repo",
+        provider: "github",
+        target: { provider: "github", repository: "owner/repo", number: 42 },
         temporaryId: "aw_def456",
+      });
+    });
+
+    it.each([
+      ["add_comment", { commentId: 123, itemNumber: 7, repo: "owner/repo" }, { provider: "github", id: 123 }],
+      ["jira_create_issue", { issue_id: "10001", issue_key: "ENG-7" }, { provider: "jira", id: "10001", identifier: "ENG-7" }],
+      ["linear_create_issue", { id: "linear-id", identifier: "ENG-8" }, { provider: "linear", id: "linear-id", identifier: "ENG-8" }],
+    ])("should preserve identity for %s", (type, result, expected) => {
+      expect(extractCreatedItemFromResult(type, result)).toMatchObject(expected);
+    });
+
+    it("should infer the azure-devops provider (hyphenated) from the metadata provider, matching ADO handler naming", () => {
+      const item = extractCreatedItemFromResult("ado_add_comment", {
+        success: true,
+        number: 123,
+        metadata: { provider: "azure-devops", project: "my-project", comment_id: 5 },
+      });
+      expect(item?.provider).toBe("azure-devops");
+      expect(item?.provider).not.toBe("azure_devops");
+    });
+
+    it("should convert a scalar target (e.g. Linear issue key) into a provider-neutral object", () => {
+      const item = extractCreatedItemFromResult("linear_add_comment", {
+        success: true,
+        id: "comment-1",
+        target: "ENG-123",
+      });
+      expect(item?.target).toEqual({ provider: "linear", identifier: "ENG-123" });
+    });
+
+    it("should associate added labels with their target and IDs", () => {
+      const item = extractCreatedItemFromResult("add_labels", {
+        repo: "owner/repo",
+        number: 12,
+        contextType: "pull_request",
+        labelsAdded: ["bug"],
+        labels: [{ name: "bug", database_id: 42 }],
+      });
+
+      expect(item).toMatchObject({
+        provider: "github",
+        target: { provider: "github", repository: "owner/repo", number: 12, kind: "pull_request" },
+        labels: [{ name: "bug", database_id: 42 }],
       });
     });
 
@@ -271,6 +377,8 @@ describe("safe_output_manifest", () => {
         type: "add_reviewer",
         number: 42,
         repo: "owner/repo",
+        provider: "github",
+        target: { provider: "github", repository: "owner/repo", number: 42 },
         metadata: {
           requested_reviewers: ["reviewer1"],
           requested_team_reviewers: ["platform-team"],
@@ -350,6 +458,8 @@ describe("safe_output_manifest", () => {
         url: "https://github.com/owner/repo/pull/1#pullrequestreview-2",
         number: 1,
         repo: "owner/repo",
+        provider: "github",
+        target: { provider: "github", repository: "owner/repo", number: 1 },
         before_state: { reviews: [] },
         after_state: { reviews: [{ id: 2, state: "COMMENTED" }] },
       });

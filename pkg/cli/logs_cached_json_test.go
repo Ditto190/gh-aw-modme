@@ -217,8 +217,10 @@ func TestCachedLogsJSONLWriterIncludesAuditArtifacts(t *testing.T) {
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	require.Len(t, lines, 2)
 	var record cachedLogsJSONLRecord
-	require.NoError(t, json.Unmarshal(bytes.TrimSpace(data), &record))
+	require.NoError(t, json.Unmarshal(lines[0], &record))
 	require.NotNil(t, record.Run)
 	require.NotNil(t, record.Run.Audit)
 	assert.Equal(t, int64(42), record.Run.Audit.Overview.RunID)
@@ -226,6 +228,111 @@ func TestCachedLogsJSONLWriterIncludesAuditArtifacts(t *testing.T) {
 	assert.Equal(t, "copilot", record.Run.AwInfo.EngineID)
 	require.Len(t, record.Run.SafeOutputs, 1)
 	assert.Equal(t, "create_issue", record.Run.SafeOutputs[0].Type)
+
+	var safeOutputRecord cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(lines[1], &safeOutputRecord))
+	wantSafeOutputKind := cachedLogsJSONLKindSafeOutput
+	assert.Equal(t, wantSafeOutputKind, safeOutputRecord.Kind)
+	require.NotNil(t, safeOutputRecord.SafeOutput)
+	assert.Equal(t, int64(42), safeOutputRecord.SafeOutput.RunID)
+	assert.Equal(t, "create_issue", safeOutputRecord.SafeOutput.Type)
+}
+
+func TestCachedLogsJSONLWriterIncludesSafeOutputsWithoutAudit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	run := ProcessedRun{
+		Run: WorkflowRun{DatabaseID: 42, Status: "completed", Conclusion: "success"},
+		SafeOutputs: []CreatedItemReport{{
+			Type:       "linear_create_issue",
+			Provider:   "linear",
+			ID:         "issue-id",
+			Identifier: "ENG-7",
+			Timestamp:  "2026-09-14T00:00:00Z",
+		}},
+	}
+
+	require.NoError(t, newCachedLogsJSONLWriter(path).Append(run))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	require.Len(t, lines, 2)
+	var record cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(lines[0], &record))
+	require.Len(t, record.Run.SafeOutputs, 1)
+	assert.Equal(t, "linear", record.Run.SafeOutputs[0].Provider)
+	assert.Equal(t, "ENG-7", record.Run.SafeOutputs[0].Identifier)
+	assert.Nil(t, record.Run.Audit)
+
+	var safeOutputRecord cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(lines[1], &safeOutputRecord))
+	wantSafeOutputKind := cachedLogsJSONLKindSafeOutput
+	assert.Equal(t, wantSafeOutputKind, safeOutputRecord.Kind)
+	require.NotNil(t, safeOutputRecord.SafeOutput)
+	assert.Equal(t, int64(42), safeOutputRecord.SafeOutput.RunID)
+	assert.Equal(t, "linear", safeOutputRecord.SafeOutput.Provider)
+	assert.Equal(t, "ENG-7", safeOutputRecord.SafeOutput.Identifier)
+	assert.Equal(t, "issue-id", safeOutputRecord.SafeOutput.ID)
+}
+
+func TestCachedLogsJSONLWriterEmitsOneEventPerSafeOutputItem(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	run := ProcessedRun{
+		Run: WorkflowRun{DatabaseID: 99, Status: "completed", Conclusion: "success"},
+		SafeOutputs: []CreatedItemReport{
+			{Type: "create_issue", Provider: "github", Number: 1, Timestamp: "2026-09-14T00:00:00Z"},
+			{Type: "add_labels", Provider: "github", Number: 1, Timestamp: "2026-09-14T00:00:01Z"},
+			{Type: "linear_add_comment", Provider: "linear", Identifier: "ENG-1", Timestamp: "2026-09-14T00:00:02Z"},
+		},
+	}
+
+	require.NoError(t, newCachedLogsJSONLWriter(path).Append(run))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	// One "run" record plus one "safe_output_item" record per entity.
+	require.Len(t, lines, 4)
+
+	var runRecord cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(lines[0], &runRecord))
+	wantRunKind := cachedLogsJSONLKindRun
+	assert.Equal(t, wantRunKind, runRecord.Kind)
+	require.Len(t, runRecord.Run.SafeOutputs, 3)
+
+	wantTypes := []string{"create_issue", "add_labels", "linear_add_comment"}
+	wantSafeOutputKind := cachedLogsJSONLKindSafeOutput
+	for i, line := range lines[1:] {
+		var record cachedLogsJSONLRecord
+		require.NoError(t, json.Unmarshal(line, &record))
+		assert.Equal(t, wantSafeOutputKind, record.Kind)
+		require.NotNil(t, record.SafeOutput)
+		assert.Equal(t, int64(99), record.SafeOutput.RunID)
+		assert.Equal(t, wantTypes[i], record.SafeOutput.Type)
+	}
+
+	// Individual safe-output events are informational only and must not create
+	// spurious entries in the in-memory run cache when read back.
+	cache, err := loadCachedLogsJSONL(path)
+	require.NoError(t, err)
+	require.Contains(t, cache.runs, int64(99))
+	assert.Len(t, cache.runs, 1)
+}
+
+func TestCachedLogsJSONLWriterOmitsSafeOutputEventsWhenNoItems(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 7, Status: "completed", Conclusion: "success"}}
+
+	require.NoError(t, newCachedLogsJSONLWriter(path).Append(run))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	require.Len(t, lines, 1)
+	var record cachedLogsJSONLRecord
+	require.NoError(t, json.Unmarshal(lines[0], &record))
+	wantRunKind := cachedLogsJSONLKindRun
+	assert.Equal(t, wantRunKind, record.Kind)
 }
 
 func TestProjectCachedLogsJSONLEvidenceSkipsIncompleteEntries(t *testing.T) {

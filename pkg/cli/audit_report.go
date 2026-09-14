@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"os"
@@ -145,15 +146,29 @@ type FileInfo struct {
 // URL is present for creation types (e.g. create_issue, add_comment) but may be empty
 // for modification types (e.g. add_labels, close_issue) that do not return a URL.
 type CreatedItemReport struct {
-	Type        string         `json:"type" console:"header:Type"`
-	URL         string         `json:"url,omitempty" console:"header:URL,omitempty"`
-	Number      int            `json:"number,omitempty" console:"header:Number,omitempty"`
-	Repo        string         `json:"repo,omitempty" console:"header:Repo,omitempty"`
-	TemporaryID string         `json:"temporaryId,omitempty" console:"header:Temp ID,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty" console:"-"`
-	BeforeState map[string]any `json:"before_state,omitempty" console:"-"`
-	AfterState  map[string]any `json:"after_state,omitempty" console:"-"`
-	Timestamp   string         `json:"timestamp" console:"header:Timestamp"`
+	Type            string         `json:"type" console:"header:Type"`
+	URL             string         `json:"url,omitempty" console:"header:URL,omitempty"`
+	Number          int            `json:"number,omitempty" console:"header:Number,omitempty"`
+	Repo            string         `json:"repo,omitempty" console:"header:Repo,omitempty"`
+	Provider        string         `json:"provider,omitempty" console:"-"`
+	ID              any            `json:"id,omitempty" console:"-"`
+	Identifier      string         `json:"identifier,omitempty" console:"-"`
+	Target          map[string]any `json:"target,omitempty" console:"-"`
+	Labels          []LabelReport  `json:"labels,omitempty" console:"-"`
+	LabelsAdded     []string       `json:"labelsAdded,omitempty" console:"-"`
+	LabelsSuggested []string       `json:"labelsSuggested,omitempty" console:"-"`
+	LabelsBefore    []string       `json:"labelsBefore,omitempty" console:"-"`
+	TemporaryID     string         `json:"temporaryId,omitempty" console:"header:Temp ID,omitempty"`
+	Metadata        map[string]any `json:"metadata,omitempty" console:"-"`
+	BeforeState     map[string]any `json:"before_state,omitempty" console:"-"`
+	AfterState      map[string]any `json:"after_state,omitempty" console:"-"`
+	Timestamp       string         `json:"timestamp" console:"header:Timestamp"`
+}
+
+type LabelReport struct {
+	Name       string `json:"name"`
+	DatabaseID int64  `json:"database_id,omitempty"`
+	NodeID     string `json:"node_id,omitempty"`
 }
 
 // ToolUsageInfo contains aggregated tool usage statistics
@@ -291,7 +306,7 @@ func buildLocalAuditData(processedRun ProcessedRun, metrics LogMetrics, mcpToolU
 	errors := extractAuditErrors(run)
 	downloadedFiles := extractDownloadedFiles(run.LogsPath)
 	toolUsage := buildAuditToolUsage(metrics, mcpToolUsage)
-	createdItems := extractCreatedItemsFromManifest(run.LogsPath)
+	createdItems := resolveCreatedItems(run.LogsPath, processedRun.SafeOutputs)
 	taskDomain, behaviorFingerprint, agenticAssessments := buildAuditAssessments(processedRun, metricsData, toolUsage, createdItems, overview.AwContext)
 	findings, recommendations, observabilityInsights := buildAuditNarrative(processedRun, metricsData, errors, toolUsage, createdItems, agenticAssessments)
 	auditData := assembleAuditData(auditDataInputs{
@@ -640,6 +655,28 @@ func extractCreatedItemsFromManifest(logsPath string) []CreatedItemReport {
 
 	auditReportLog.Printf("Extracted %d created item(s) from manifest", len(items))
 	return items
+}
+
+// resolveCreatedItems returns created items read from the on-disk safe-output manifest
+// at logsPath, falling back to entities already carried in-memory (e.g. from a cached
+// usage/activity summary) only when the manifest file itself is absent — such as when an
+// `--artifacts usage`-only cache is reused and the manifest was never downloaded. A manifest
+// file that exists but legitimately contains no created items is not treated as missing, so
+// runs with no safe outputs are reported as empty rather than falling back to stale cached data.
+func resolveCreatedItems(logsPath string, cachedSafeOutputs []CreatedItemReport) []CreatedItemReport {
+	if logsPath != "" {
+		manifestPath := filepath.Join(logsPath, safeOutputItemsManifestFilename)
+		_, err := os.Stat(manifestPath)
+		switch {
+		case err == nil:
+			return extractCreatedItemsFromManifest(logsPath)
+		case errors.Is(err, os.ErrNotExist):
+			// Manifest genuinely absent (e.g. usage-only cache reuse); fall back below.
+		default:
+			auditReportLog.Printf("Error checking safe-output manifest %s: %v", manifestPath, err)
+		}
+	}
+	return cachedSafeOutputs
 }
 
 // describeFile provides a short description for known artifact files
