@@ -596,17 +596,21 @@ func (c *Compiler) buildPushRepoMemoryJob(data *WorkflowData, threatDetectionEna
 
 	setupActionRef := c.resolveActionReference("./actions/setup", data)
 	steps := c.buildPushRepoMemorySetupAndCheckoutSteps(data, setupActionRef)
-	steps = append(steps, c.buildPushRepoMemoryDownloadSteps(data)...)
+	_, hasConsolidatedSafeOutputsJob := c.jobManager.GetJob(string(constants.SafeOutputsJobName))
+	steps = append(steps, c.buildPushRepoMemoryDownloadSteps(data, hasConsolidatedSafeOutputsJob)...)
 
 	useRequire := setupActionRef != ""
 	for _, memory := range data.RepoMemoryConfig.Memories {
-		steps = append(steps, c.buildSinglePushRepoMemoryStep(data, memory, useRequire))
+		steps = append(steps, c.buildSinglePushRepoMemoryStep(data, memory, useRequire, hasConsolidatedSafeOutputsJob))
 	}
 	if c.actionMode.IsDev() {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 	}
 
 	jobCondition, jobNeeds := c.buildPushRepoMemoryJobCondition(threatDetectionEnabled)
+	if hasConsolidatedSafeOutputsJob {
+		jobNeeds = append(jobNeeds, string(constants.SafeOutputsJobName))
+	}
 	outputs := buildPushRepoMemoryOutputs(data.RepoMemoryConfig.Memories)
 	concurrencyGroup := buildPushRepoMemoryConcurrencyGroup(data.RepoMemoryConfig.Memories)
 	concurrency := c.indentYAMLLines(fmt.Sprintf("concurrency:\n  group: %q\n  cancel-in-progress: false", concurrencyGroup), "    ")
@@ -644,9 +648,19 @@ func (c *Compiler) buildPushRepoMemorySetupAndCheckoutSteps(data *WorkflowData, 
 }
 
 // buildPushRepoMemoryDownloadSteps builds download-artifact steps for all memory entries.
-func (c *Compiler) buildPushRepoMemoryDownloadSteps(data *WorkflowData) []string {
+func (c *Compiler) buildPushRepoMemoryDownloadSteps(data *WorkflowData, hasConsolidatedSafeOutputsJob bool) []string {
 	repoMemoryPrefix := artifactPrefixExprForAgentDownstreamJob(data)
 	var steps []string
+	if hasConsolidatedSafeOutputsJob {
+		steps = append(steps,
+			"      - name: Download safe-output temporary ID map\n",
+			fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/download-artifact")),
+			"        continue-on-error: true\n",
+			"        with:\n",
+			fmt.Sprintf("          name: %s%s\n", repoMemoryPrefix, constants.SafeOutputItemsArtifactName),
+			"          path: /tmp/gh-aw/safe-outputs-items\n",
+		)
+	}
 	for _, memory := range data.RepoMemoryConfig.Memories {
 		sanitizedID := SanitizeWorkflowIDForCacheKey(memory.ID)
 		var step strings.Builder
@@ -666,7 +680,7 @@ func (c *Compiler) buildPushRepoMemoryDownloadSteps(data *WorkflowData) []string
 }
 
 // buildSinglePushRepoMemoryStep builds a single push-repo-memory step for one memory entry.
-func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory RepoMemoryEntry, useRequire bool) string {
+func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory RepoMemoryEntry, useRequire, hasConsolidatedSafeOutputsJob bool) string {
 	targetRepo := memory.TargetRepo
 	if targetRepo == "" {
 		targetRepo = "${{ github.repository }}"
@@ -689,9 +703,7 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 	step.WriteString("        if: always()\n")
 	fmt.Fprintf(&step, "        uses: %s\n", getCachedActionPin("actions/github-script", data))
 	step.WriteString("        env:\n")
-	step.WriteString("          GH_TOKEN: ${{ github.token }}\n")
-	step.WriteString("          GITHUB_RUN_ID: ${{ github.run_id }}\n")
-	step.WriteString("          GITHUB_SERVER_URL: ${{ github.server_url }}\n")
+	step.WriteString(buildRepoMemoryGitHubEnv(data, hasConsolidatedSafeOutputsJob))
 	fmt.Fprintf(&step, "          ARTIFACT_DIR: %s\n", artifactDir)
 	fmt.Fprintf(&step, "          MEMORY_ID: %s\n", memory.ID)
 	fmt.Fprintf(&step, "          TARGET_REPO: %s\n", targetRepo)
@@ -727,6 +739,16 @@ func (c *Compiler) buildSinglePushRepoMemoryStep(data *WorkflowData, memory Repo
 		}
 	}
 	return step.String()
+}
+
+func buildRepoMemoryGitHubEnv(data *WorkflowData, hasConsolidatedSafeOutputsJob bool) string {
+	env := "          GH_TOKEN: ${{ github.token }}\n" +
+		"          GITHUB_RUN_ID: ${{ github.run_id }}\n" +
+		"          GITHUB_SERVER_URL: ${{ github.server_url }}\n"
+	if hasConsolidatedSafeOutputsJob {
+		env += "          GH_AW_TEMPORARY_ID_MAP_FILE: /tmp/gh-aw/safe-outputs-items/" + constants.TemporaryIdMapFilename.String() + "\n"
+	}
+	return env
 }
 
 // buildPushRepoMemoryJobCondition computes the job condition and needs list.

@@ -73,10 +73,56 @@ func TestJobsWithRepoMemoryDependencies(t *testing.T) {
 			t.Error("push_repo_memory should depend on detection job (detection is now a separate job)")
 		}
 	}
+	if !slices.Contains(pushRepoMemoryJob.Needs, string(constants.SafeOutputsJobName)) {
+		t.Error("push_repo_memory should depend on safe_outputs so temporary ID mappings are finalized first")
+	}
+	pushSteps := strings.Join(pushRepoMemoryJob.Steps, "\n")
+	if !strings.Contains(pushSteps, "Download safe-output temporary ID map") {
+		t.Error("push_repo_memory should download the temporary ID map artifact from safe_outputs")
+	}
+	if !strings.Contains(pushSteps, "GH_AW_TEMPORARY_ID_MAP_FILE: /tmp/gh-aw/safe-outputs-items/temporary-id-map.json") {
+		t.Error("push_repo_memory should receive the temporary ID map artifact path")
+	}
 
 	// Verify job name
 	if pushRepoMemoryJob.Name != "push_repo_memory" {
 		t.Errorf("Expected job name 'push_repo_memory', got %q", pushRepoMemoryJob.Name)
+	}
+}
+
+func TestJobsWithRepoMemoryWithoutConsolidatedSafeOutputs(t *testing.T) {
+	compiler := NewCompiler()
+	compiler.jobManager = NewJobManager()
+	data := &WorkflowData{
+		Name:   "Test Workflow",
+		AI:     "copilot",
+		RunsOn: "runs-on: ubuntu-latest",
+		RepoMemoryConfig: &RepoMemoryConfig{
+			Memories: []RepoMemoryEntry{{ID: "test-memory", BranchName: "memory-branch"}},
+		},
+		SafeOutputs: &SafeOutputsConfig{
+			UploadAssets: &UploadAssetsConfig{},
+		},
+	}
+
+	compiler.stepOrderTracker = NewStepOrderTracker()
+	activationJob, _ := compiler.buildActivationJob(data, false, "", "test.lock.yml")
+	compiler.jobManager.AddJob(activationJob)
+	agentJob, _ := compiler.buildMainJob(data, true)
+	compiler.jobManager.AddJob(agentJob)
+	if err := compiler.buildSafeOutputsJobs(data, string(constants.AgentJobName), "test.md"); err != nil {
+		t.Fatalf("buildSafeOutputsJobs() error: %v", err)
+	}
+
+	pushRepoMemoryJob, err := compiler.buildPushRepoMemoryJob(data, false)
+	if err != nil {
+		t.Fatalf("buildPushRepoMemoryJob() error: %v", err)
+	}
+	if slices.Contains(pushRepoMemoryJob.Needs, string(constants.SafeOutputsJobName)) {
+		t.Error("push_repo_memory should not depend on a consolidated safe_outputs job that was not created")
+	}
+	if strings.Contains(strings.Join(pushRepoMemoryJob.Steps, "\n"), "GH_AW_TEMPORARY_ID_MAP") {
+		t.Error("push_repo_memory should not reference a temporary ID map from a consolidated safe_outputs job that was not created")
 	}
 }
 
