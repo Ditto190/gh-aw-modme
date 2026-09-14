@@ -120,12 +120,15 @@ Duplicate entries SHOULD be ignored after normalization.
 ### 4.10.1 `imports`
 
 If present, `imports` MUST be an array of strings. Each entry MUST resolve relative to the
-manifest containing it, MUST name an `aw.yml` file, and MUST remain within the top-level
-package root after normalization. Absolute paths and paths that escape that root MUST be
-rejected.
+manifest containing it, MUST name an `aw.yml` file, and MUST remain within the repository
+root after normalization. An entry MAY resolve above the package being installed, so a
+nested package MAY import a manifest closer to the repository root (for example
+`../aw.yml`). Absolute paths and paths that escape the repository root MUST be rejected.
 
 Imports are recursive. Implementations MUST detect import cycles and report the manifest
-path chain forming the cycle. Each manifest MUST be parsed and validated before its package
+path chain forming the cycle. An entry that resolves to the manifest declaring it (for
+example `./aw.yml`) is a self-import; implementations MUST ignore it with a warning rather
+than reporting a cycle. Each manifest MUST be parsed and validated before its package
 assets are added to a unified install list. Imported workflows, resources, skills, and
 agents MUST retain paths relative to the directory containing their manifest. Top-level
 package metadata and `config` MUST NOT be replaced by imported manifest values.

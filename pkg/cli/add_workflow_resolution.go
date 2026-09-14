@@ -482,8 +482,9 @@ func resolveLocalRepositoryPackage(source string) (*resolvedRepositoryPackage, e
 	if err := validateLocalRepositoryPackageContents(manifestPath); err != nil {
 		return nil, err
 	}
-	manifestNodes, importWarnings, err := resolveRepositoryPackageManifestGraph(manifestPath, manifest, func(importPath string) ([]byte, error) {
-		return readLocalImportedManifest(importPath, packageDir)
+	importRoot := localPackageImportRoot(packageDir)
+	manifestNodes, importWarnings, err := resolveRepositoryPackageManifestGraph(manifestPath, manifest, importRoot, func(importPath string) ([]byte, error) {
+		return readLocalImportedManifest(importPath, importRoot)
 	})
 	if err != nil {
 		return nil, err
@@ -497,7 +498,7 @@ func resolveLocalRepositoryPackage(source string) (*resolvedRepositoryPackage, e
 	}
 	warnings = append(warnings, importWarnings...)
 
-	assets, err := resolveLocalRepositoryPackageManifestNodes(manifestNodes, packageDir)
+	assets, err := resolveLocalRepositoryPackageManifestNodes(manifestNodes, importRoot)
 	if err != nil {
 		return nil, err
 	}

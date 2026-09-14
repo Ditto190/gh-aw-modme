@@ -112,13 +112,14 @@ func validateLocalRepositoryPackageContents(manifestPath string) error {
 			return err
 		}
 		packageDir := filepath.Dir(manifestPath)
-		nodes, _, err := resolveRepositoryPackageManifestGraph(manifestPath, manifest, func(importPath string) ([]byte, error) {
-			return readLocalImportedManifest(importPath, packageDir)
+		importRoot := localPackageImportRoot(packageDir)
+		nodes, _, err := resolveRepositoryPackageManifestGraph(manifestPath, manifest, importRoot, func(importPath string) ([]byte, error) {
+			return readLocalImportedManifest(importPath, importRoot)
 		})
 		if err != nil {
 			return err
 		}
-		assets, err := resolveLocalRepositoryPackageManifestNodes(nodes, packageDir)
+		assets, err := resolveLocalRepositoryPackageManifestNodes(nodes, importRoot)
 		if err != nil {
 			return err
 		}
