@@ -149,6 +149,7 @@ describe("handle_agent_failure", () => {
       { flag: "hasMissingTool", expected: "[aw] Test Workflow is missing required tool" },
       { flag: "hasMissingData", expected: "[aw] Test Workflow is missing required data" },
       { flag: "hasAssignmentErrors", expected: "[aw] Test Workflow failed to assign agent" },
+      { flag: "copilotOrgBillingError", expected: "[aw] Test Workflow hit Copilot organization billing error" },
     ];
 
     it.each(cases)("returns expected title for isolated $flag", ({ flag, expected }) => {
@@ -3562,6 +3563,75 @@ describe("handle_agent_failure", () => {
   // buildModelNotSupportedErrorContext
   // ──────────────────────────────────────────────────────
 
+  describe("buildCopilotOrgBillingErrorContext", () => {
+    let buildCopilotOrgBillingErrorContext;
+    let detectCopilotOrgBillingErrorFromLog;
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    let tmpDir;
+
+    beforeEach(() => {
+      vi.resetModules();
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "aw-test-copilot-org-billing-"));
+      const promptsDir = path.join(tmpDir, "gh-aw", "prompts");
+      fs.mkdirSync(promptsDir, { recursive: true });
+      fs.copyFileSync(path.join(runtimePromptsDir, "copilot_org_billing_error.md"), path.join(promptsDir, "copilot_org_billing_error.md"));
+      process.env.RUNNER_TEMP = tmpDir;
+      ({ buildCopilotOrgBillingErrorContext, detectCopilotOrgBillingErrorFromLog } = require("./handle_agent_failure.cjs"));
+    });
+
+    afterEach(() => {
+      delete process.env.RUNNER_TEMP;
+      delete process.env.GH_AW_ENGINE_ID;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("returns billing and PAT guidance for a detected organization-billed failure", () => {
+      const result = buildCopilotOrgBillingErrorContext(true);
+      expect(result).toContain("Copilot organization billing is unavailable");
+      expect(result).toContain("Allow use of Copilot CLI billed to the organization");
+      expect(result).toContain("COPILOT_GITHUB_TOKEN");
+      expect(result).toContain("https://github.github.com/gh-aw/reference/billing/");
+    });
+
+    it("returns no guidance when the combined error was not detected", () => {
+      expect(buildCopilotOrgBillingErrorContext(false)).toBe("");
+    });
+
+    it.each([
+      "[copilot-harness] awf-reflect: models fetch returned 403 for http://api-proxy:10002/models",
+      "Copilot requests authentication failed through the gh-aw API proxy (HTTP 403, model=auto, stage=listing models).",
+      "Authentication failed with provider at http://172.30.0.30:10002 (HTTP 403).",
+    ])("detects reported organization-billed Copilot error: %s", errorOutput => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, `[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\n${errorOutput}`);
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(true);
+    });
+
+    it("does not classify PAT-based Copilot failures as organization billing errors", () => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, "[copilot-harness] awf-reflect: models fetch returned 403 for http://api-proxy:10002/models");
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(false);
+    });
+
+    it.each(["host.docker.internal", "localhost", "127.0.0.1", "10.1.2.3", "192.168.1.4"])("detects provider auth failures against host-bridge proxy host %s", proxyHost => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, `[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\nAuthentication failed with provider at http://${proxyHost}:10002 (HTTP 403).`);
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(true);
+    });
+
+    it.each(["Access denied by policy settings", "invalid access to inference"])("does not classify generic inference access rejection %s as an organization billing error", errorOutput => {
+      process.env.GH_AW_ENGINE_ID = "copilot";
+      const logPath = path.join(tmpDir, "agent-stdio.log");
+      fs.writeFileSync(logPath, `[INFO] API proxy enabled: OpenAI=false, Copilot=true (github-token)\n${errorOutput}`);
+      expect(detectCopilotOrgBillingErrorFromLog(logPath)).toBe(false);
+    });
+  });
+
   describe("buildModelNotSupportedErrorContext", () => {
     let buildModelNotSupportedErrorContext;
     const fs = require("fs");
@@ -5636,6 +5706,16 @@ describe("handle_agent_failure", () => {
       for (let i = 1; i < categories.length; i++) {
         expect(categories[i] >= categories[i - 1]).toBe(true);
       }
+    });
+
+    it("returns copilot_org_billing_error category instead of the agent_failure fallback", () => {
+      const categories = buildFailureMatchCategories({
+        agentConclusion: "failure",
+        isTimedOut: false,
+        copilotOrgBillingError: true,
+      });
+      expect(categories).toContain("copilot_org_billing_error");
+      expect(categories).not.toContain("agent_failure");
     });
 
     it("returns http_400_response_error category", () => {
