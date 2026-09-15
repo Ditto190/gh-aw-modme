@@ -16,6 +16,7 @@ import { requireFsCloseSyncRule } from "./rules/require-fs-close-sync";
 import { requireFsSyncTryCatchRule } from "./rules/require-fs-sync-try-catch";
 import { requireJsonParseTryCatchRule } from "./rules/require-json-parse-try-catch";
 import { requireErrorCauseInRethrowRule } from "./rules/require-error-cause-in-rethrow";
+import { requireEnvParseIntNanCheckRule } from "./rules/require-env-parseint-nan-check";
 import { requireParseIntRadixRule } from "./rules/require-parseInt-radix";
 import { requireMkdirSyncTryCatchRule } from "./rules/require-mkdirsync-try-catch";
 import { requireMkdtempSyncTryCatchRule } from "./rules/require-mkdtempsync-try-catch";
@@ -90,6 +91,7 @@ const plugin = {
     "require-realpathsync-try-catch": requireRealpathSyncTryCatchRule,
     "require-rmsync-try-catch": requireRmSyncTryCatchRule,
     "require-parseInt-radix": requireParseIntRadixRule,
+    "require-env-parseint-nan-check": requireEnvParseIntNanCheckRule,
     "require-return-after-core-setfailed": requireReturnAfterCoreSetFailedRule,
     "require-spawnsync-error-check": requireSpawnSyncErrorCheckRule,
     "require-spawn-error-listener": requireSpawnErrorListenerRule,
