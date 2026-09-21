@@ -2240,9 +2240,7 @@ jobs:
     runs-on: ubuntu-slim
     permissions:
       contents: write
-    concurrency:
-      group: "push-repo-memory-${{ github.repository }}|memory/delight"
-      cancel-in-progress: false
+    timeout-minutes: 10
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
