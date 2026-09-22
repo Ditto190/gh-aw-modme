@@ -154,6 +154,59 @@ describe("create_pull_request - draft policy enforcement", () => {
     expect(result.metadata).toEqual({ node_id: "PR_kwDOtest456" });
   });
 
+  it("should depth-limit the base branch fetch in a shallow repository", async () => {
+    global.exec.getExecOutput.mockImplementation((cmd, args) => {
+      if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
+        return Promise.resolve({ exitCode: 0, stdout: "true\n", stderr: "" });
+      }
+      if (cmd === "git" && args[0] === "show-ref") {
+        return Promise.resolve({ exitCode: 1, stdout: "", stderr: "" });
+      }
+      return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+    });
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true });
+
+    const result = await handler({ title: "Test PR", body: "Test body" }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.exec.exec).toHaveBeenCalledWith("git", ["fetch", "--depth=1", "origin", "main"]);
+  });
+
+  it("should preserve existing base history in a shallow repository", async () => {
+    global.exec.getExecOutput.mockImplementation((cmd, args) => {
+      if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
+        return Promise.resolve({ exitCode: 0, stdout: "true\n", stderr: "" });
+      }
+      return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+    });
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true });
+
+    const result = await handler({ title: "Test PR", body: "Test body" }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.exec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "main"]);
+    expect(global.exec.exec).not.toHaveBeenCalledWith("git", ["fetch", "--depth=1", "origin", "main"]);
+  });
+
+  it("should preserve a sparse-full repository when fetching the base branch", async () => {
+    global.exec.getExecOutput.mockImplementation((cmd, args) => {
+      if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
+        return Promise.resolve({ exitCode: 0, stdout: "false\n", stderr: "" });
+      }
+      return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+    });
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ allow_empty: true });
+
+    const result = await handler({ title: "Test PR", body: "Test body" }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.exec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "main"]);
+    expect(global.exec.exec).not.toHaveBeenCalledWith("git", ["fetch", "--depth=1", "origin", "main"]);
+  });
+
   it("should enforce draft: false from config even when agent requests draft: true", async () => {
     const { main } = require("./create_pull_request.cjs");
     const handler = await main({ draft: "false", allow_empty: true });
@@ -3263,6 +3316,27 @@ describe("create_pull_request - patch apply fallback to original base commit", (
     expect(global.exec.exec).toHaveBeenCalledWith("git", ["cat-file", "-e", MOCK_BASE_COMMIT_SHA]);
     const checkoutWithBaseCommit = global.exec.exec.mock.calls.find(([cmd, args]) => cmd === "git" && Array.isArray(args) && args[0] === "checkout" && args[1] === "-b" && args[3] === MOCK_BASE_COMMIT_SHA);
     expect(checkoutWithBaseCommit).toBeTruthy();
+  });
+
+  it("should preserve an existing shallow base ref for the patch ancestry check", async () => {
+    global.exec = {
+      exec: vi.fn().mockResolvedValue(0),
+      getExecOutput: vi.fn().mockImplementation((cmd, args) => {
+        if (cmd === "git" && args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
+          return Promise.resolve({ exitCode: 0, stdout: "true\n", stderr: "" });
+        }
+        return Promise.resolve({ exitCode: 0, stdout: "", stderr: "" });
+      }),
+    };
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({});
+    const result = await handler({ title: "Test PR", body: "Test body", branch: "test-branch", base_commit: MOCK_BASE_COMMIT_SHA }, {});
+
+    expect(result.success).toBe(true);
+    expect(global.exec.exec).toHaveBeenCalledWith("git", ["fetch", "origin", "main"]);
+    expect(global.exec.exec).not.toHaveBeenCalledWith("git", ["fetch", "--depth=1", "origin", "main"]);
+    expect(global.exec.getExecOutput).toHaveBeenCalledWith("git", ["merge-base", "--is-ancestor", MOCK_BASE_COMMIT_SHA, "origin/main"], { ignoreReturnCode: true });
   });
 
   it("should ignore agent-supplied base_commit values when creating the branch", async () => {
