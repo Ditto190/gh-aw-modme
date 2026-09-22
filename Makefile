@@ -498,6 +498,7 @@ test-scripts: build
 	bash scripts/resolve-base-commit_test.sh
 	bash scripts/check-workflow-drift_test.sh ./$(BINARY_NAME)
 	bash scripts/check-cgo-cjs-workflow-purity_test.sh
+	bash scripts/update-threat-detect-pins_test.sh
 	bash actions/setup/sh/copy_gh_aw_binary_for_mcp_test.sh
 	@echo "✓ All Bash script tests passed"
 
@@ -1315,6 +1316,23 @@ update: build
 	$(MAKE) sync-install-script-hashes
 	$(MAKE) build
 
+# Update the reviewed threat-detect release pins and generated workflows
+.PHONY: update-threat-detect-pins
+update-threat-detect-pins:
+	@if [ -z "$(THREAT_DETECT_VERSION)" ]; then \
+		echo "Usage: make update-threat-detect-pins THREAT_DETECT_VERSION=v0.5.2"; \
+		exit 1; \
+	fi
+	@if ! printf '%s\n' "$(THREAT_DETECT_VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "Error: THREAT_DETECT_VERSION must be a semantic release tag such as v0.5.2"; \
+		echo "Usage: make update-threat-detect-pins THREAT_DETECT_VERSION=v0.5.2"; \
+		exit 1; \
+	fi
+	bash scripts/update-threat-detect-pins.sh "$(THREAT_DETECT_VERSION)"
+	$(MAKE) fmt
+	$(MAKE) recompile
+	@echo "✓ Threat-detect pins updated; review pkg/constants/version_constants.go, pkg/constants/version_constants_test.go, and generated workflow locks together."
+
 # Run development server
 .PHONY: dev
 dev: build
@@ -1469,6 +1487,7 @@ help:
 	@echo "  check-stale-compat - Guard: detect when compat.json max-agent is out of sync with DefaultCopilotVersion"
 	@echo "  sync-install-script-hashes - Update install-gh-aw.sh SHA and SHA256 constants in pkg/cli/copilot_setup.go (runs automatically during update)"
 	@echo "  update           - Update GitHub Actions and workflows, sync action pins, and rebuild binary"
+	@echo "  update-threat-detect-pins - Update reviewed threat-detect pins; set THREAT_DETECT_VERSION=vX.Y.Z"
 	@echo "  fix              - Apply automatic codemod-style fixes to workflow files (depends on build)"
 	@echo "  recompile        - Recompile all workflow files (runs init, depends on build)"
 	@echo "  merge-main       - Format, merge main, recompile workflows, and format again"
