@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"path"
+	"slices"
 	"strings"
 )
 
@@ -77,7 +79,7 @@ func ParseCheckoutConfigs(raw any) ([]*CheckoutConfig, error) {
 }
 
 // checkoutConfigFromMap converts a raw map to a CheckoutConfig.
-func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) {
+func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) { //nolint:largefunc // Existing checkout parsing remains centralized.
 	cfg := &CheckoutConfig{}
 
 	if v, ok := m["repository"]; ok {
@@ -106,6 +108,9 @@ func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) {
 		// are treated identically by the checkout step generator.
 		if s == "." {
 			s = ""
+		}
+		if err := validateCheckoutPath(s); err != nil {
+			return nil, err
 		}
 		cfg.Path = s
 	}
@@ -279,17 +284,34 @@ func checkoutConfigFromMap(m map[string]any) (*CheckoutConfig, error) {
 	return cfg, nil
 }
 
-// buildCheckoutsPromptContent returns a markdown bullet list describing all user-configured
+// validateCheckoutPath rejects checkout paths that escape the workspace root.
+// actions/checkout requires the path to be located under $GITHUB_WORKSPACE, and
+// paths containing ".." segments would also render misleadingly in the agent prompt
+// because they collapse into a plausible-looking but incorrect location.
+func validateCheckoutPath(p string) error {
+	if p == "" {
+		return nil
+	}
+	normalized := strings.ReplaceAll(p, "\\", "/")
+	if strings.HasPrefix(normalized, "/") {
+		return fmt.Errorf("checkout.path must be a relative path under the workspace, got %q. Example:\ncheckout:\n  path: external/repo", p)
+	}
+	if slices.Contains(strings.Split(normalized, "/"), "..") {
+		return fmt.Errorf("checkout.path must not contain \"..\" segments, got %q. Use a path under the workspace. Example:\ncheckout:\n  path: external/repo", p)
+	}
+	return nil
+}
+
 // checkouts for inclusion in the GitHub context prompt.
 // Returns an empty string when no checkouts are configured.
 //
-// Each checkout is shown with its full absolute path relative to $GITHUB_WORKSPACE.
+// Each checkout is shown with its full absolute path using the runtime github.workspace value.
 // The root checkout (path == "") is annotated as "(cwd)" since that is the working
 // directory of the agent process. The generated content may include
 // "${{ github.repository }}" for any checkout that does not have an explicit repository
 // configured; callers must ensure these expressions are processed by an ExpressionExtractor
 // so the placeholder substitution step can resolve them at runtime.
-func buildCheckoutsPromptContent(checkouts []*CheckoutConfig) string {
+func buildCheckoutsPromptContent(checkouts []*CheckoutConfig) string { //nolint:largefunc // Checkout annotations are emitted together for consistent prompt guidance.
 	if len(checkouts) == 0 {
 		checkoutManagerLog.Print("buildCheckoutsPromptContent: no checkouts configured, returning empty content")
 		return ""
@@ -304,16 +326,16 @@ func buildCheckoutsPromptContent(checkouts []*CheckoutConfig) string {
 			continue
 		}
 
-		// Build the full absolute path using $GITHUB_WORKSPACE as root.
+		// Build the full absolute path using the runtime workspace as root.
 		// Normalize the path: strip "./" prefix; bare "." and "" both mean root.
 		relPath := strings.TrimPrefix(cfg.Path, "./")
 		if relPath == "." {
 			relPath = ""
 		}
 		isRoot := relPath == ""
-		absPath := "$GITHUB_WORKSPACE"
+		absPath := "${{ github.workspace }}"
 		if !isRoot {
-			absPath += "/" + relPath
+			absPath = path.Join(absPath, relPath)
 		}
 
 		// Determine repo: use configured value or fall back to the triggering repository expression.
@@ -359,9 +381,10 @@ func buildCheckoutsPromptContent(checkouts []*CheckoutConfig) string {
 		sb.WriteString(line + "\n")
 	}
 
-	// General guidance about unavailable branches
-	sb.WriteString("  - **Note**: If a branch you need is not in the list above and is not listed as an additional fetched ref, " +
-		"it has NOT been checked out. For private repositories you cannot fetch it. " +
+	// General guidance about the workspace root and unavailable branches
+	sb.WriteString("  - **Note**: The workspace path reported above may contain a separate shallow, credential-free checkout of the host repository. " +
+		"Use the exact checkout path shown for the repository you need. Before concluding that a branch is unavailable, confirm your working directory matches that path and inspect refs there. " +
+		"If the branch is not present in that checkout and is not listed as an additional fetched ref, it has NOT been checked out. For private repositories you cannot fetch it. " +
 		"If the branch is required and not available, exit with an error and ask the user to add it to the " +
 		"`fetch:` option of the `checkout:` configuration (e.g., `fetch: [\"refs/pulls/open/*\"]` for all open PR refs, " +
 		"or `fetch: [\"main\", \"feature/my-branch\"]` for specific branches).\n")
